@@ -1,0 +1,38 @@
+@startuml
+' duty-shift.puml
+title Duty Shift Schema (24h, Night, Default Day)
+
+actor "Head" as S
+participant "Денний" as DD
+participant "Нічний" as DN
+participant "Добовий " as D24
+
+S -> D24 : Розклад (9:00-9:00)
+S -> DN : Розклад (17:00-09:00)
+S -> DD : Розклад (09:00–17:00 )
+
+
+activate DD
+
+DD -> DN : перезмінка
+
+deactivate DD
+activate DN
+
+DN -> DD : перезмінка
+DN -> D24 : перезмінка
+
+deactivate DN
+
+
+
+
+activate D24
+D24 -> D24 : перезмінка
+D24 -> DD : перезмінка
+
+deactivate D24
+
+
+
+@enduml

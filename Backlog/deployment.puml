@@ -1,0 +1,48 @@
+@startuml
+!theme plain
+title Deployment Architecture: Shift Schedule Notification
+
+rectangle "Namecheap Shared Hosting (cPanel)" as hosting {
+  component "cron job (trigger)" as cron
+  component "main.py\n(entry point)" as main
+  folder "~/venv/\n(Python venv)" as venv
+  file "~/.env\n(secrets/config)" as env
+  file "~/schedule.xlsx\n(read-only input)" as xlsx
+  file "~/shift_bot.db\n(SQLite — audit + receipts)" as db
+  folder "~/logs/\n(output log files)" as logs
+}
+
+rectangle "External systems" as external {
+  component "Telegram Bot API" as tgAPI
+  component "Viber Bot API" as vbAPI
+}
+
+rectangle "End recipients" as recipients {
+  actor "Staff on Telegram" as tgStaff
+  actor "Staff on Viber" as vbStaff
+}
+
+rectangle "Management" as management {
+  actor "Admin" as admin
+  actor "Head of Department" as head
+}
+
+
+' Flow and Dependencies
+cron --> main : invokes
+main --> venv : uses
+main --> env : reads
+main --> xlsx : reads
+main --> db   : reads/writes
+main --> logs : writes
+
+main --> tgAPI : REST sendMessage
+main --> vbAPI : REST send_message
+
+tgAPI --> tgStaff : delivers
+vbAPI --> vbStaff : delivers
+
+head -> admin
+admin --> hosting
+
+@enduml

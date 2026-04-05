@@ -1,0 +1,100 @@
+@startuml
+' component.puml
+!theme plain
+title Component Architecture — Shift Schedule Notification Bot
+' Pattern: Adapter | Sprint 001 | 2026-04-05
+
+' ===== File System Artifacts =====
+file "~/.env\n(secrets/config)" as env
+file "~/schedule.xlsx\n(read-only)" as xlsx
+file "~/shift_bot.db\n(SQLite)" as sqlitedb
+folder "~/logs/\n(timestamped log files)" as logs
+
+' ===== External Messenger APIs =====
+rectangle "External Systems" as extSys {
+  component [Telegram Bot API] as tgAPI
+  component [Viber Bot API]    as vbAPI
+}
+
+' ===== Application Boundary =====
+rectangle "Application  (Python, venv, one-shot script)" as app {
+
+  component [main.py\nOrchestrator] as main
+  component [cli.py\nCLI & Mode Parser] as cli
+  note right of cli
+    Parses sys.argv, returns mode object.
+    Modes: health | dry-run | production |
+           reload-schedule.
+    No message ever sent without --production.
+  end note
+
+  component [config.py\nConfig & Startup Validation] as config
+  note right of config
+    Loads all env variables at startup.
+    Missing variable → log error, exit(1).
+    No further execution with broken config.
+  end note
+
+  component [db.py\nSQLite Layer] as db
+  note right of db
+    Creates shift_bot.db on first run.
+    Schema: notifications, receipts.
+    Only db.py may read/write the DB.
+    No SQL in any other module.
+  end note
+
+  component [schedule_parser.py\nXLSX Parser] as parser
+  note right of parser
+    Reads schedule.xlsx on every run.
+    Returns typed list of Shift objects.
+    No network calls, no side effects.
+  end note
+
+  component [shift_logic.py\nPure Shift Logic] as logic
+  note right of logic
+    Sorts shifts by date/time.
+    Finds prev/next colleague
+    per employee by (role, location).
+    Pure functions only — fully unit-testable,
+    zero I/O, zero network calls.
+  end note
+
+  package "messenger/" as messengerPkg {
+    interface "MessengerGateway\n<<interface>>" as gw
+    component [telegram_adapter.py\nTelegram REST — P1] as tgA
+    component [viber_adapter.py\nViber REST — P2 deferred] as vbA
+    note bottom of messengerPkg
+      DEPENDENCY LOCALITY RULE:
+      Only telegram_adapter.py and viber_adapter.py
+      may call external messenger REST endpoints.
+      main.py, shift_logic.py, schedule_parser.py
+      must NEVER call requests to messenger APIs directly.
+    end note
+  }
+}
+
+' ===== Boot Sequence (orchestrated by main.py) =====
+' Steps 1-4 must all succeed before any message is sent.
+' Step 5 must complete for ALL employees before Step 6 begins.
+main --> cli     : "parse flags → mode"
+main --> config  : "① load & validate config"
+main --> db      : "② init DB / verify schema"
+main --> gw      : "③ init messenger sessions"
+main --> parser  : "④ parse schedule.xlsx"
+main --> logic   : "⑤ compute prev/next shifts"
+main --> gw      : "⑥ dispatch messages"
+main --> logs    : "⑦ write summary log"
+
+' ===== Internal Wiring =====
+config ..> env  : reads
+parser ..> xlsx : reads
+db     ..> sqlitedb : reads/writes
+
+gw <|.. tgA : implements
+gw <|.. vbA : implements
+
+' ===== Dependency Locality — ONLY adapters touch REST =====
+tgA --> tgAPI : "REST sendMessage"
+vbA --> vbAPI : "REST send_message"
+
+@enduml

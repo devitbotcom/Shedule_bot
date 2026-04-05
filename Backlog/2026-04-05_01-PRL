@@ -1,0 +1,64 @@
+# PRL: Shift Schedule Notification
+
+## Purpose
+Inform staff about:
+- their duty and work schedule,
+- who is the previous shift and who is the next shift,
+
+See /home/itb/GIT-IT-BOT/Project_Schedule_bot/Shedule_bot/Backlog/shifts-Duty_Shift_Schema__24h__Night__Default_Day_.png
+
+## Scope
+- XLSX file is the source of truth for the schedule.
+- Staff are familiar with Viber and Telegram; only those two messengers are used.
+- Security is at normal operational level (no E2E encryption required; rely on messenger defaults).
+- no payroll integration, no mobile app.
+- No real‑time shift swaps in prove of concept.
+
+## Roles
+- Schedule Manager
+  - Maintains and updates the XLSX schedule.
+  - Triggers the notification process.
+- Staff
+  - Receive a personal message with their duty, shift time, previous shift colleague, and next shift colleague.
+- IT / System Owner
+  - Manages the bot or script that sends messages.
+  - Ensures XLSX and messenger tokens are stored securely.
+
+## Inputs
+- XLSX schedule file with columns:
+  - Shift start date DD-MM-YYYYY,
+  - Employee Name, Duty type,
+- Employee registry (can be a separate sheet or table) with:
+  - Name, Role, Messenger (Viber / Telegram), Chat ID / Phone.
+- Duty types
+  - 24 hours, Night, Day.
+
+## Process
+1. Schedule Manager updates the XLSX with:
+   - Dates, shifts, employees, and their duties.
+   - Each employee’s preferred messenger.
+2. System reads the XLSX:
+   - For each employee, it finds:
+     - The previous shift (same location, same role) before their shift.
+     - The next shift (same location, same role) after their shift.
+3. System sends a message per employee:
+   - Duty, date, time.
+   - Previous shift colleague (name and role).
+   - Next shift colleague (name and role).
+4. Staff receive the message in their preferred messenger (Viber / Telegram).
+
+## Outputs
+- A personal message per employee in the format:
+  - Duty, date, time.
+  - Previous shift: `Name (Role)`.
+  - Next shift: `Name (Role)` starts at `Time`.
+- Optionally:
+  - a simple receipt or “✅” confirmation reply from staff.
+  - a report the issue "Escalate" inform about availability or position.
+  - a call for staff "Call"  admin sends if staff is absent.
+
+## Security (Normal Level)
+- Messenger tokens are stored in environment variables or a secrets manager, not in code.
+- XLSX is stored in a protected, access‑controlled location (internal network share, SSO‑protected drive).
+- Only authorised users can modify the XLSX.
+- Communications use the normal security level of Viber / Telegram (no extra E2E encryption required).
