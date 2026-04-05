@@ -1,0 +1,22 @@
+# OS artefacts
+.DS_Store
+Thumbs.db
+*.swp
+
+# Junie added The .output.txt was a "snapshot" of a broken build state.
+.output.txt
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Secrets — never commit
+.env
+*.jks
+*.keystore
+key.properties
