@@ -4,14 +4,21 @@
 **Date:** 2026-04-05  
 **Status:** ✅ APPROVED — P1 Telegram, P2 Viber deferred, Python 3.11.14 confirmed
 
----
+
+### Sprint status
+Status [DONE]
+Assigned to [OWNER]
+
+Note the flow: Owner <-> Architect <-> Developer <-> QA -> Owner.
 
 ## Diagrams
 
-| Diagram | File | View |
-|---------|------|------|
-| Deployment | [`Backlog/deployment.puml`](../deployment.puml) | Infrastructure: hosting, cron, env, APIs, actors |
-| Component  | [`Backlog/component.puml`](../component.puml)   | Internal: Adapter pattern, module boundaries, boot sequence, dependency locality |
+| Diagram    | File                                             | View                                                                            |
+|------------|--------------------------------------------------|---------------------------------------------------------------------------------|
+| Deployment | [`Backlog/deployment.puml`](../deployment.puml)  | Infrastructure: hosting, cron, env, APIs, actors                                |
+| Component  | [`Backlog/component.puml`](../component.puml)    | Internal: Adapter pattern, module boundaries, boot sequence, dependency locality |
+
+**Sprint Plan:** [`20260405_SprintPlan_ShiftNotificationBot.md`](20260405_SprintPlan_ShiftNotificationBot.md) — sprint register, SDLC stages, UAT gates, handoff protocol
 
 ---
 

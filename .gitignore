@@ -22,3 +22,9 @@ Thumbs.db
 key.properties
 
 *.png
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
