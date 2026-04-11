@@ -3,62 +3,119 @@
 ## Purpose
 Inform staff about:
 - their duty and work schedule,
-- who is the previous shift and who is the next shift,
+- who is the previous shift and who is the next shift.
 
-See /home/itb/GIT-IT-BOT/Project_Schedule_bot/Shedule_bot/Backlog/shifts-Duty_Shift_Schema__24h__Night__Default_Day_.png
+See `/Backlog/shifts-Duty_Shift_Schema__24h__Night__Default_Day_.png`
+
+---
 
 ## Scope
-- XLSX file is the source of truth for the schedule.
+- XLSX file is the source of truth for **the schedule grid only** (dates, departments, staff names).
+- Shift type rules and messenger contact registry are **not** stored in the XLSX — they live in a separate config file.
 - Staff are familiar with Viber and Telegram; only those two messengers are used.
 - Security is at normal operational level (no E2E encryption required; rely on messenger defaults).
-- no payroll integration, no mobile app.
-- No real‑time shift swaps in prove of concept.
+- No payroll integration, no mobile app.
+- No real-time shift swaps in proof of concept.
+
+---
 
 ## Roles
-- Schedule Manager
-  - Maintains and updates the XLSX schedule.
-  - Triggers the notification process.
-- Staff
-  - Receive a personal message with their duty, shift time, previous shift colleague, and next shift colleague.
-- IT / System Owner
-  - Manages the bot or script that sends messages.
-  - Ensures XLSX and messenger tokens are stored securely.
+- **Schedule Manager** — maintains and updates the XLSX schedule; triggers the notification process.
+- **Staff** — receive a personal message with their duty, shift time, previous shift colleague, and next shift colleague.
+- **IT / System Owner** — manages the bot or script that sends messages; ensures XLSX and messenger tokens are stored securely.
+
+---
 
 ## Inputs
-- XLSX schedule file with columns:
-  - Shift start date DD-MM-YYYYY,
-  - Employee Name, Duty type,
-- Employee registry (can be a separate sheet or table) with:
-  - Name, Role, Messenger (Viber / Telegram), Chat ID / Phone.
-- Duty types
-  - 24 hours, Night, Day.
+
+### 1. XLSX Schedule File (`Apr.xlsx`)
+
+The grid contains **only** the following structured data:
+
+| Column | Content |
+|--------|---------|
+| A — Дата | Day of month (integer 1–31) |
+| B — Приймальне відділення | Staff name on duty |
+| C — Анестезіологія | Staff name on duty |
+| D — Реанімація | Staff name on duty |
+| E — Хірургія | Staff name on duty |
+| F — Акушерство | Staff name on duty |
+| G — Травматологія | Staff name on duty |
+| H — Неврологія | Staff name on duty |
+| I — УЗД | Staff name on duty |
+| J — Дитяче відділення | Staff name on duty |
+
+Column K ("Ургенція спеціалістів на дому") is **not** part of the grid — see section below.
+
+### 2. "Ургенція спеціалістів на дому" (Home Call Specialists)
+
+This is a **separate data block** embedded in column K of the XLSX (rows below and alongside the grid).
+It is parsed independently from the schedule grid.
+
+**Format:** Each non-empty cell is either:
+- A **specialty header** — a plain label with no day numbers (e.g. `Хірург :`, `Окуліст`, `Денні хірурги:`, `КДЛ`, `ФГДС`, `Реанімація`)
+- A **name + day-list entry** — `<LastName І.П.> <day>[,<day>…]`
+  - Day separators may be `,` or `.` (both must be handled by the parser)
+  - Example: `Губар І.А. 1,3,4,6,7` or `ШумейкоО.І.2.5.8.11`
+
+The parser must group entries under the specialty header that precedes them.
+
+### 3. Shift Rules Config (`shift_rules.json` or `config.py`)
+
+Shift types are **not derived from the XLSX** — they are fixed business rules stored in config:
+
+| Day | Shift type | Duration |
+|-----|-----------|---------|
+| Monday – Friday | Night shift | 24 h |
+| Saturday, Sunday | Day shift | 2 h |
+
+Config must expose: `get_shift_type(date) → ShiftType`, `get_shift_duration(date) → timedelta`.
+
+### 4. Employee Registry
+
+Can be a separate sheet in the XLSX or a standalone file:
+
+| Field | Description |
+|-------|-------------|
+| Name | Full name (matches spelling in schedule grid) |
+| Role | Department / specialty |
+| Messenger | Viber or Telegram |
+| Chat ID / Phone | Messenger contact identifier |
+
+---
 
 ## Process
-1. Schedule Manager updates the XLSX with:
-   - Dates, shifts, employees, and their duties.
-   - Each employee’s preferred messenger.
+
+1. Schedule Manager updates the XLSX with dates, staff, and departments.
 2. System reads the XLSX:
-   - For each employee, it finds:
-     - The previous shift (same location, same role) before their shift.
-     - The next shift (same location, same role) after their shift.
-3. System sends a message per employee:
-   - Duty, date, time.
-   - Previous shift colleague (name and role).
-   - Next shift colleague (name and role).
+   - Parses the grid (cols A–J) to build the shift list.
+   - Parses col K to extract "Ургенція" assignments (name → [dates]).
+   - Applies shift rules from config to determine shift type and duration for each date.
+   - For each employee, finds the previous and next shift (same department).
+3. System sends one message per employee:
+   - Duty, date, shift type, duration.
+   - Previous shift colleague (name, role).
+   - Next shift colleague (name, role, start time).
 4. Staff receive the message in their preferred messenger (Viber / Telegram).
 
+---
+
 ## Outputs
-- A personal message per employee in the format:
-  - Duty, date, time.
-  - Previous shift: `Name (Role)`.
-  - Next shift: `Name (Role)` starts at `Time`.
-- Optionally:
-  - a simple receipt or “✅” confirmation reply from staff.
-  - a report the issue "Escalate" inform about availability or position.
-  - a call for staff "Call"  admin sends if staff is absent.
+
+A personal message per employee:
+- Duty, date, shift type and duration.
+- Previous shift: `Name (Role)`.
+- Next shift: `Name (Role)` starts at `Time`.
+
+Optional:
+- A `✅` confirmation reply from staff.
+- An "Escalate" report — staff signals unavailability.
+- A "Call" alert — admin notifies of an absent staff member.
+
+---
 
 ## Security (Normal Level)
 - Messenger tokens are stored in environment variables or a secrets manager, not in code.
-- XLSX is stored in a protected, access‑controlled location (internal network share, SSO‑protected drive).
+- XLSX is stored in a protected, access-controlled location (internal network share or SSO-protected drive).
 - Only authorised users can modify the XLSX.
 - Communications use the normal security level of Viber / Telegram (no extra E2E encryption required).
