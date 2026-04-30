@@ -35,6 +35,7 @@ DD-MM-YYYY о HH:MM — {next_name}
 | `cli.py`                                 | `--date YYYY-MM-DD` flag added with format validation; requires `--production`                                                                | ✅       |
 | `schedule_parser.py`                     | `_load_mapping` → `load_mapping` (public); `shift_hours` HH:MM validation; `_DAY_TYPE_ALIASES` for British spelling                           | ✅       |
 | `data/schedule_mapping.json.example`     | `shift_hours` block added                                                                                                                     | ✅       |
+| `data/schedule_mapping.json`             | `shift_hours` block added with default values — GAP-004 fix                                                                                  | ✅       |
 | `tests/test_telegram_adapter.py`         | New — 6 unit tests, all mocked                                                                                                                | ✅       |
 | `tests/test_format_message.py`           | New — 11 unit tests; HOURS dict param; BUG-001 regression + custom hours tests                                                                | ✅       |
 | `tests/test_cli.py`                      | 3 tests added: `--date` happy path, missing `--production`, invalid format                                                                    | ✅       |

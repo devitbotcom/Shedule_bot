@@ -94,6 +94,7 @@ If the key is absent, the same values are used as built-in defaults — existing
 **Scope of change:**
 - `schedule_parser.py`: rename `_load_mapping` → `load_mapping` (public); add `shift_hours` validation
 - `data/schedule_mapping.json.example`: add `shift_hours` block
+- `data/schedule_mapping.json`: add `shift_hours` block with default values (IT-visible config)
 - `main.py`: call `load_mapping()` at startup; pass `shift_hours` to `_format_message()`
 - `tests/create_fixture.py`: include `shift_hours` in fixture mapping
 - `tests/test_format_message.py`: pass `shift_hours` to all calls
@@ -108,7 +109,8 @@ If the key is absent, the same values are used as built-in defaults — existing
 
 ### AD-005 — `run_health()` — Telegram check
 
-`TelegramAdapter.health_check()` (`getMe`) added to health check sequence. Returns `[TELEGRAM] ✅/❌`. Failure sets `all_ok = False` → exit 1. Requires a real token — placeholder token will show `[TELEGRAM] ❌`.
+`TelegramAdapter.health_check()` (`getMe`) added to health check sequence. Returns `[TELEGRAM] ✅/❌`. 
+Failure sets `all_ok = False` → exit 1. Requires a real token — placeholder token will show `[TELEGRAM] ❌`.
 
 ---
 
@@ -144,7 +146,8 @@ If the key is absent, the same values are used as built-in defaults — existing
 - Bypasses dedup if `run_mode.force`
 - Exits 0 if `failed == 0`, exits 1 otherwise
 
-### `_format_message(ctx: ShiftContext) -> str`
+### `_format_message(ctx: ShiftContext, shift_hours: dict) -> str`
 - Pure function — no I/O
 - Handles missing prev/next with `-`
 - No double period on names ending in `.`
+- `shift_hours` dict keyed by day_type; fallback `"09:00"` for unknown types (see AD-006)

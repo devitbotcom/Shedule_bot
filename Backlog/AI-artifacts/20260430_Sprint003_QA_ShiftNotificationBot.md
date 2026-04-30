@@ -2,7 +2,7 @@
 **Sprint:** 003  
 **Role:** QA Engineer  
 **Date:** 2026-04-30 (re-review after Developer fixes)  
-**Status:** ✅ PASS — all bugs fixed, 63/63 tests green. Ready for Owner UAT.  
+**Status:** ❌ FAIL — GAP-004 open. Developer must add `shift_hours` to `data/schedule_mapping.json`.  
 **Dev ref:** [`20260430_Sprint003_DEV_ShiftNotificationBot.md`](20260430_Sprint003_DEV_ShiftNotificationBot.md)  
 **Arch ref:** [`20260430_Sprint003_ARCH_ShiftNotificationBot.md`](20260430_Sprint003_ARCH_ShiftNotificationBot.md)
 
@@ -65,7 +65,7 @@ All four bugs from the first QA pass (BUG-001 through BUG-004) are fixed and ver
 
 ## New Feature Verification
 
-### AD-006 — Configurable `shift_hours` → ✅ PASS
+### AD-006 — Configurable `shift_hours` → ❌ FAIL — GAP-004
 
 - `schedule_mapping.json.example` updated with `shift_hours` block ✅
 - `load_mapping()` validates each value against `HH:MM` regex; exits 1 on invalid format ✅
@@ -73,6 +73,7 @@ All four bugs from the first QA pass (BUG-001 through BUG-004) are fixed and ver
 - `_format_message(ctx, shift_hours)` uses `shift_hours.get(day_type, "09:00")` — unknown day_type falls back safely ✅
 - `test_custom_shift_hours_used` verifies custom labor time overrides default ✅
 - Existing tests updated to pass `HOURS` dict — no calls use stale zero-arg signature ✅
+- `data/schedule_mapping.json` — **`shift_hours` block missing** ❌ — see GAP-004
 
 ### AD-001 — `--date` CLI flag → ✅ PASS
 
@@ -81,6 +82,20 @@ All four bugs from the first QA pass (BUG-001 through BUG-004) are fixed and ver
 - Invalid format rejected at parse time (exit 2) ✅
 - Valid value stored in `RunMode.date` and passed through to `run_production()` ✅
 - `test_production_date`, `test_date_without_production_exits`, `test_date_invalid_format_exits` — all pass ✅
+
+---
+
+## Finding — GAP-004 — `shift_hours` missing from live IT config file (Severity: Medium)
+
+**File:** `data/schedule_mapping.json`
+
+`data/schedule_mapping.json.example` was updated with the `shift_hours` block per AD-006. The live IT-managed file `data/schedule_mapping.json` was not updated.
+
+**Impact:** No runtime error — `_shift_hours()` falls back to `_DEFAULT_SHIFT_HOURS` when the key is absent. However, IT has no visible `shift_hours` entry in their real config file and cannot discover or use the feature without separately consulting the `.example`.
+
+**Fix required:** Add `shift_hours` block with default values to `data/schedule_mapping.json`.
+
+**Status:** ❌ Open — Developer to fix.
 
 ---
 
@@ -146,5 +161,5 @@ Tests import `_format_message` from `main`. Works because `main.py` has no impor
 | Role        | Name | Date       | Status                                        |
 |-------------|------|------------|-----------------------------------------------|
 | Developer   | AI   | 2026-04-30 | ✅                                             |
-| QA Engineer | AI   | 2026-04-30 | ✅ PASS — all bugs fixed, ready for Owner UAT |
+| QA Engineer | AI   | 2026-04-30 | ❌ FAIL — GAP-004 open, Developer must fix    |
 | **Owner**   |      |            | ⏸ Awaiting UAT                                |
