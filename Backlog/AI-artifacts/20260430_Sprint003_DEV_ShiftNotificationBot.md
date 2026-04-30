@@ -75,6 +75,8 @@ Made public (removed underscore prefix) so `main.py` can call it directly for `s
 | BUG-002 | `--employee` filter applied before `compute_contexts()` — wrong prev/next | Filter moved to after `compute_contexts()`            |
 | BUG-003 | `run_production()` sent all month's shifts, not just today                | Filter `all_shifts` to `shift_date == target_date`    |
 | BUG-004 | No rate limiting between Telegram sends                                   | `time.sleep(1)` after each successful send            |
+| BUG-005 | "Наступна зміна" always "-" — date filter stripped tomorrow's shifts before `compute_contexts()` | `compute_contexts(all_shifts)` on full month; date filter moved to contexts (AD-001 amendment) |
+| CR-003-2 | Add department title to message header line | `f"Зміна: {s.department} {date_display}\n"` — uses XLSX column header already stored in `Shift.department`, mapped via `department_columns` in `schedule_mapping.json` |
 
 ---
 

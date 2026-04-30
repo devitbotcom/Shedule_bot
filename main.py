@@ -68,7 +68,7 @@ def _format_message(ctx: ShiftContext, shift_hours: dict) -> str:
         next_line = "-"
 
     return (
-        f"Зміна: {date_display}\n"
+        f"Зміна: {s.department} {date_display}\n"
         f"{s.employee_name} заступає на зміну замість {prev_name}.\n"
         f"\n"
         f"Наступна зміна:\n"
@@ -175,14 +175,16 @@ def run_production(config: dict, run_mode: RunMode) -> None:
 
     all_shifts = parse_schedule(config["XLSX_PATH"], config["TELEGRAM_GROUP_CHAT_ID"], _mapping_path(config))
 
-    # BUG-003: filter to today's date only — XLSX contains full month
-    shifts = [s for s in all_shifts if s.shift_date == target_date]
-    if not shifts:
+    # AD-001: compute contexts on full month so prev/next resolve across date boundaries
+    all_contexts = compute_contexts(all_shifts)
+
+    # AD-001 + BUG-003: filter contexts (not input shifts) to target date
+    contexts = [c for c in all_contexts if c.shift.shift_date == target_date]
+    if not contexts:
         print(f"[PRODUCTION] No shifts found for date: {target_date}")
         sys.exit(0)
 
-    # BUG-002: compute prev/next on full date's shifts, then apply employee filter
-    contexts = compute_contexts(shifts)
+    # AD-004: apply employee filter after context computation
     if run_mode.employee:
         contexts = [c for c in contexts if c.shift.employee_name == run_mode.employee]
         if not contexts:

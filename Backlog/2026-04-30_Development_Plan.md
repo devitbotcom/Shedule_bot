@@ -13,10 +13,12 @@
 
 ## POC Scope
 
-Each staff member listed in the XLSX schedule grid receives one personal Telegram message per shift. Message format:
+Each staff member (per department) listed in the XLSX schedule grid receives one personal Telegram message per shift. 
+
+Message format:
 
 ```
-Зміна: {date}
+Зміна: {department_title} {date}
 {staff_name} заступає на зміну замість {previous_staff_name}.
 
 Наступна зміна:

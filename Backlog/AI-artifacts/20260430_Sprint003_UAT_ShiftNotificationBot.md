@@ -10,9 +10,26 @@
 ---
 
 
-Feedback:
 
-### 003-1  Unexpected - for upcoming shift. [CRITICAL]
+### 003-2 Change-request - Add department to message (DONE)
+
+Expected:
+Each staff member (per department) listed in the XLSX schedule grid receives one personal Telegram message per shift.
+
+department_title  is by source XLSX - Shedule_bot/data/schedule.xlsx
+and it needs to be mapped in Shedule_bot/data/schedule_mapping.json
+
+Message format:
+
+```
+Зміна: {department_title} {date}
+{staff_name} заступає на зміну замість {previous_staff_name}.
+
+Наступна зміна:
+{next_date} о {next_time} — {next_staff_name}
+```
+
+### 003-1  Unexpected - for upcoming shift. [DONE]
 
 STR: 
 

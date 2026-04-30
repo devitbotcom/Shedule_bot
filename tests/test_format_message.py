@@ -106,7 +106,7 @@ def test_full_message_structure():
     ctx = make_ctx(shift, prev=prev, next_=next_)
     msg = _format_message(ctx, HOURS)
     assert msg == (
-        "Зміна: 07-04-2026\n"
+        "Зміна: Dept 07-04-2026\n"
         "Іваненко О.В. заступає на зміну замість Петренко А.С.\n"
         "\n"
         "Наступна зміна:\n"
