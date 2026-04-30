@@ -68,23 +68,23 @@ Made public (removed underscore prefix) so `main.py` can call it directly for `s
 
 ## Bug Fixes Applied
 
-| Bug | Description | Fix |
-|-----|-------------|-----|
-| BUG-001 | Double period for names ending with `.` (e.g. `А.С..`) | `raw_prev.rstrip(".")` before inserting into template |
-| BUG-002 | `--employee` filter applied before `compute_contexts()` — wrong prev/next | Filter moved to after `compute_contexts()` |
-| BUG-003 | `run_production()` sent all month's shifts, not just today | Filter `all_shifts` to `shift_date == target_date` |
-| BUG-004 | No rate limiting between Telegram sends | `time.sleep(1)` after each successful send |
+| Bug     | Description                                                               | Fix                                                   |
+|---------|---------------------------------------------------------------------------|-------------------------------------------------------|
+| BUG-001 | Double period for names ending with `.` (e.g. `А.С..`)                    | `raw_prev.rstrip(".")` before inserting into template |
+| BUG-002 | `--employee` filter applied before `compute_contexts()` — wrong prev/next | Filter moved to after `compute_contexts()`            |
+| BUG-003 | `run_production()` sent all month's shifts, not just today                | Filter `all_shifts` to `shift_date == target_date`    |
+| BUG-004 | No rate limiting between Telegram sends                                   | `time.sleep(1)` after each successful send            |
 
 ---
 
 ## Tech Debt
 
-| # | Description | Severity | Decision |
-|---|-------------|----------|----------|
-| TD-001 | `run_production()` orchestrator has no tests (dedup, send, record, error path) — GAP-001 | Medium | Deferred — requires mock wiring for DB + adapter; low risk given covered unit tests |
-| TD-002 | `--employee` filter behavior not covered by integration test — GAP-002 | Low | Deferred |
-| TD-003 | `--force` flag behavior not covered by test — GAP-003 | Low | Deferred |
-| TD-004 | Date column returns integer `1` for real XLSX (day-of-month format not yet supported) | Medium | NTD — Owner accepted at S002 UAT |
+| #      | Description                                                                              | Severity  | Decision                                                                            |
+|--------|------------------------------------------------------------------------------------------|-----------|-------------------------------------------------------------------------------------|
+| TD-001 | `run_production()` orchestrator has no tests (dedup, send, record, error path) — GAP-001 | Medium    | Deferred — requires mock wiring for DB + adapter; low risk given covered unit tests |
+| TD-002 | `--employee` filter behavior not covered by integration test — GAP-002                   | Low       | Deferred                                                                            |
+| TD-003 | `--force` flag behavior not covered by test — GAP-003                                    | Low       | Deferred                                                                            |
+| TD-004 | Date column returns integer `1` for real XLSX (day-of-month format not yet supported)    | Medium    | NTD — Owner accepted at S002 UAT                                                    |
 
 ---
 
