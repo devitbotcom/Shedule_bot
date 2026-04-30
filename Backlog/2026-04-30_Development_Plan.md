@@ -111,3 +111,27 @@ Owner runs `python main.py --production` on the server and:
 | Portability            | Adaptability       | Local dev env (Docker) + production target (Namecheap cPanel, Python 3.11.14).          | Not started |
 
 **S003 scope is locked.** All blocking items resolved. See Discussion doc for full Q&A record.
+
+---
+
+## Change Request — CR-001 *(assigned to: Architect)*
+
+**Date:** 2026-04-30  
+**Raised by:** Owner  
+**Status:** ⏳ Awaiting Architect decision — S003 on hold until resolved
+
+**Description:**  
+Current design sends individual personal Telegram DMs to each staff member (one `contact_id` per person in `contacts.json`). Owner has proposed an alternative: send to a **Telegram group chat** shared by all staff, using a single group `chat_id`.
+
+**Impact:**
+- `contacts.json` structure may change (group ID vs individual IDs)
+- Message template privacy: group mode exposes all shift handover details to all group members
+- `contacts.json.example` and README IT setup instructions need updating
+- Potentially simplifies IT onboarding (one group ID vs collecting individual chat IDs)
+
+**Architect must decide:**
+- Option A — Personal DMs (current design): each person receives a private message; IT collects individual chat IDs via `/start`
+- Option B — Group chat: one message per shift sent to a shared group; IT provides one group ID
+- Option C — Hybrid: personal DMs where contact exists, group fallback
+
+**S003 cannot start until this is resolved.**

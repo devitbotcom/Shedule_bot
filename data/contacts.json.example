@@ -1,0 +1,12 @@
+[
+  {
+    "name": "Єрема В.Р.",
+    "channels": { "telegram": "123456789" },
+    "primary_channel": "telegram"
+  },
+  {
+    "name": "Марченко А.С.",
+    "channels": { "telegram": "987654321" },
+    "primary_channel": "telegram"
+  }
+]

@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import sys
@@ -10,15 +11,31 @@ from models import Shift
 
 logger = logging.getLogger(__name__)
 
-COL_SHIFT_DATE    = "shift_date"
-COL_EMPLOYEE_NAME = "employee_name"
-COL_DUTY_TYPE     = "duty_type"
-COL_ROLE          = "role"
-COL_MESSENGER     = "messenger"
-COL_CONTACT_ID    = "contact_id"
+# Row in the XLSX that contains column headers (rows 1-5 are title block)
+HEADER_ROW = 6
 
-SHEET_SCHEDULE  = 1   # Sheet index (1-based in openpyxl active/sheet access)
-SHEET_REGISTRY  = 2
+# Required column headers — must match XLSX exactly (case-sensitive)
+HDR_DATE     = "Дата"
+HDR_DAY_TYPE = "Day-type"
+
+DEPARTMENT_HEADERS: list[str] = [
+    "Приймальне відділення",
+    "Анестезіологія",
+    "реанімація",
+    "хірургія",
+    "акушерство",
+    "травматологія",
+    "неврологія",
+    "УЗД",
+    "Дитяче відділення",
+]
+
+# Present in XLSX but out of POC scope — parser logs INFO and skips it
+HDR_URGENCIA = "Ургенція спеціалістів на дому"
+
+REQUIRED_HEADERS: list[str] = [HDR_DATE, HDR_DAY_TYPE] + DEPARTMENT_HEADERS
+
+VALID_DAY_TYPES = {"labor", "holiday", "other"}
 
 
 def check_file_freshness(xlsx_path: str, threshold_seconds: int = 60) -> None:
@@ -28,100 +45,132 @@ def check_file_freshness(xlsx_path: str, threshold_seconds: int = 60) -> None:
         modified_at = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
         raise RuntimeError(
             f"XLSX was modified {age:.0f}s ago (at {modified_at}) — "
-            f"possible upload in progress. Skipping run. Path: {xlsx_path}"
+            f"possible upload in progress. Path: {xlsx_path}"
         )
 
 
-def _get_headers(sheet) -> dict:
-    headers = {}
-    for col_idx, cell in enumerate(next(sheet.iter_rows(min_row=1, max_row=1)), start=1):
-        if cell.value:
-            headers[str(cell.value).strip().lower()] = col_idx
-    return headers
+def _load_contacts(contacts_path: str) -> dict[str, dict]:
+    try:
+        with open(contacts_path, encoding="utf-8") as f:
+            entries = json.load(f)
+    except OSError as exc:
+        logger.critical("Cannot open contacts file: %s — %s", contacts_path, exc)
+        print(f"[CONTACTS] ❌ cannot open: {contacts_path}")
+        sys.exit(1)
+    except json.JSONDecodeError as exc:
+        logger.critical("Invalid JSON in contacts file: %s — %s", contacts_path, exc)
+        print(f"[CONTACTS] ❌ invalid JSON: {contacts_path}")
+        sys.exit(1)
+
+    contacts: dict[str, dict] = {}
+    for entry in entries:
+        name = str(entry.get("name", "")).strip()
+        if name:
+            contacts[name] = entry
+    return contacts
 
 
-def _require_columns(headers: dict, required: list, sheet_name: str) -> None:
-    for col in required:
-        if col not in headers:
-            logger.error("Missing column '%s' in sheet '%s'", col, sheet_name)
-            print(f"[XLSX]    ❌ missing column '{col}' in sheet '{sheet_name}'")
-            sys.exit(1)
+def _build_header_map(sheet, header_row: int) -> dict[str, int]:
+    rows = list(sheet.iter_rows(min_row=header_row, max_row=header_row, values_only=True))
+    header_map: dict[str, int] = {}
+    for col_idx, value in enumerate(rows[0], start=1):
+        if value is not None:
+            header_map[str(value).strip()] = col_idx
+    return header_map
 
 
-def parse_schedule(xlsx_path: str, location_default: str) -> list:
+def _require_headers(header_map: dict[str, int], required: list[str]) -> None:
+    missing = [h for h in required if h not in header_map]
+    if not missing:
+        return
+    for h in missing:
+        logger.critical("Missing required XLSX header: '%s'", h)
+        print(f"[XLSX]    ❌ missing required header: '{h}'")
+    sys.exit(1)
+
+
+def _parse_date(raw: object, context: str) -> str | None:
+    if isinstance(raw, datetime):
+        return raw.strftime("%Y-%m-%d")
+    try:
+        return datetime.strptime(str(raw).strip(), "%d-%m-%Y").strftime("%Y-%m-%d")
+    except ValueError:
+        logger.warning("Unrecognised date '%s' on row %s — skipping", raw, context)
+        return None
+
+
+def parse_schedule(xlsx_path: str, contacts_path: str) -> list[Shift]:
     check_file_freshness(xlsx_path)
 
     try:
         wb = openpyxl.load_workbook(xlsx_path, data_only=True)
     except Exception as exc:
-        logger.error("Cannot open XLSX: %s — %s", xlsx_path, exc)
-        print(f"[XLSX]    ❌ cannot open file: {xlsx_path}")
+        logger.critical("Cannot open XLSX: %s — %s", xlsx_path, exc)
+        print(f"[XLSX]    ❌ cannot open: {xlsx_path}")
         sys.exit(1)
 
-    sheet_names = wb.sheetnames
-    if len(sheet_names) < 2:
-        logger.error("XLSX must have at least 2 sheets; found %d", len(sheet_names))
-        print("[XLSX]    ❌ expected 2 sheets (Schedule, Employee Registry)")
-        sys.exit(1)
+    ws = wb.worksheets[0]
+    header_map = _build_header_map(ws, HEADER_ROW)
+    _require_headers(header_map, REQUIRED_HEADERS)
 
-    # --- Sheet 1: Schedule ---
-    ws_schedule = wb.worksheets[0]
-    sched_headers = _get_headers(ws_schedule)
-    _require_columns(sched_headers, [COL_SHIFT_DATE, COL_EMPLOYEE_NAME, COL_DUTY_TYPE], sheet_names[0])
+    if HDR_URGENCIA in header_map:
+        logger.info("Column '%s' found but skipped (out of POC scope)", HDR_URGENCIA)
 
-    # --- Sheet 2: Employee Registry ---
-    ws_registry = wb.worksheets[1]
-    reg_headers = _get_headers(ws_registry)
-    _require_columns(reg_headers, [COL_EMPLOYEE_NAME, COL_ROLE, COL_MESSENGER, COL_CONTACT_ID], sheet_names[1])
+    contacts = _load_contacts(contacts_path)
+    shifts: list[Shift] = []
+    skip_count = 0
 
-    registry = {}
-    for row in ws_registry.iter_rows(min_row=2, values_only=True):
-        name = row[reg_headers[COL_EMPLOYEE_NAME] - 1]
-        if not name:
-            continue
-        name = str(name).strip()
-        registry[name] = {
-            COL_ROLE:       str(row[reg_headers[COL_ROLE] - 1] or "").strip(),
-            COL_MESSENGER:  str(row[reg_headers[COL_MESSENGER] - 1] or "").strip().lower(),
-            COL_CONTACT_ID: str(row[reg_headers[COL_CONTACT_ID] - 1] or "").strip(),
-        }
+    for row in ws.iter_rows(min_row=HEADER_ROW + 1, values_only=True):
+        raw_date     = row[header_map[HDR_DATE] - 1]
+        raw_day_type = row[header_map[HDR_DAY_TYPE] - 1]
 
-    shifts = []
-    for row in ws_schedule.iter_rows(min_row=2, values_only=True):
-        raw_date     = row[sched_headers[COL_SHIFT_DATE] - 1]
-        employee_name = str(row[sched_headers[COL_EMPLOYEE_NAME] - 1] or "").strip()
-        duty_type    = str(row[sched_headers[COL_DUTY_TYPE] - 1] or "").strip()
-
-        if not employee_name or not raw_date:
+        if raw_date is None:
             continue
 
-        # Convert date: accept DD-MM-YYYY string or datetime object
-        if isinstance(raw_date, datetime):
-            shift_date = raw_date.strftime("%Y-%m-%d")
-        else:
-            try:
-                shift_date = datetime.strptime(str(raw_date).strip(), "%d-%m-%Y").strftime("%Y-%m-%d")
-            except ValueError:
-                logger.warning("Unrecognised date format '%s' for employee '%s' — skipping", raw_date, employee_name)
+        shift_date = _parse_date(raw_date, str(raw_date))
+        if shift_date is None:
+            continue
+
+        day_type = str(raw_day_type or "").strip().lower()
+        if day_type not in VALID_DAY_TYPES:
+            logger.warning("Unknown day_type '%s' on %s — skipping row", day_type, shift_date)
+            continue
+
+        for dept in DEPARTMENT_HEADERS:
+            if dept not in header_map:
+                continue
+            cell_value = row[header_map[dept] - 1]
+            if cell_value is None:
                 continue
 
-        if employee_name not in registry:
-            logger.warning("Employee '%s' not in registry — skipping", employee_name)
-            continue
+            employee_name = str(cell_value).strip()
+            if not employee_name:
+                continue
 
-        emp = registry[employee_name]
-        if not emp[COL_CONTACT_ID]:
-            logger.warning("Empty contact_id for employee '%s' — skipping", employee_name)
-            continue
+            if employee_name not in contacts:
+                logger.warning("'%s' not in contacts.json — skipping", employee_name)
+                skip_count += 1
+                continue
 
-        shifts.append(Shift(
-            employee_name=employee_name,
-            role=emp[COL_ROLE],
-            duty_type=duty_type,
-            shift_date=shift_date,
-            location=location_default,
-            messenger=emp[COL_MESSENGER],
-            contact_id=emp[COL_CONTACT_ID],
-        ))
+            contact = contacts[employee_name]
+            primary = str(contact.get("primary_channel", "telegram")).strip()
+            channel_id = str(contact.get("channels", {}).get(primary, "")).strip()
+
+            if not channel_id:
+                logger.warning("Empty contact_id for '%s' — skipping", employee_name)
+                skip_count += 1
+                continue
+
+            shifts.append(Shift(
+                employee_name=employee_name,
+                department=dept,
+                day_type=day_type,
+                shift_date=shift_date,
+                messenger=primary,
+                contact_id=channel_id,
+            ))
+
+    if skip_count:
+        logger.warning("Total skipped (no contact match or missing contact_id): %d", skip_count)
 
     return shifts

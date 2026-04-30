@@ -1,31 +1,24 @@
 from typing import Optional
+
 from models import Shift, ShiftContext
 
-DUTY_ORDER = {"Day": 0, "Night": 1, "24h": 2}
 
-
-def _sort_key(shift: Shift) -> tuple:
-    return (shift.shift_date, DUTY_ORDER.get(shift.duty_type, 99))
-
-
-def compute_contexts(shifts: list) -> list:
-    sorted_shifts = sorted(shifts, key=_sort_key)
-    contexts = []
+def compute_contexts(shifts: list[Shift]) -> list[ShiftContext]:
+    sorted_shifts = sorted(shifts, key=lambda s: (s.shift_date, s.department))
+    contexts: list[ShiftContext] = []
 
     for i, shift in enumerate(sorted_shifts):
         prev_colleague: Optional[Shift] = None
         next_colleague: Optional[Shift] = None
 
         for j in range(i - 1, -1, -1):
-            candidate = sorted_shifts[j]
-            if candidate.role == shift.role and candidate.location == shift.location:
-                prev_colleague = candidate
+            if sorted_shifts[j].department == shift.department:
+                prev_colleague = sorted_shifts[j]
                 break
 
         for j in range(i + 1, len(sorted_shifts)):
-            candidate = sorted_shifts[j]
-            if candidate.role == shift.role and candidate.location == shift.location:
-                next_colleague = candidate
+            if sorted_shifts[j].department == shift.department:
+                next_colleague = sorted_shifts[j]
                 break
 
         contexts.append(ShiftContext(

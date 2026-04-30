@@ -1,0 +1,10 @@
+services:
+  bot:
+    build: .
+    volumes:
+      - .:/app        # code — edit without rebuild
+      - ./data:/data  # IT-managed files (contacts.json, schedule.xlsx, db, logs) — edit without rebuild
+    working_dir: /app
+    env_file:
+      - path: .env
+        required: false

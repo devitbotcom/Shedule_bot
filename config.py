@@ -1,5 +1,6 @@
 import os
 import sys
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -8,8 +9,8 @@ REQUIRED_VARS = (
     "XLSX_PATH",
     "DB_PATH",
     "LOG_DIR",
+    "CONTACTS_PATH",
     "TELEGRAM_BOT_TOKEN",
-    "LOCATION_DEFAULT",
 )
 
 

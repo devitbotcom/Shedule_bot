@@ -1,28 +1,54 @@
-"""Run once to generate tests/fixtures/sample_schedule.xlsx"""
+"""Run once to generate tests/fixtures/sample_schedule.xlsx and contacts.json"""
+import json
 import os
+
 import openpyxl
 
-FIXTURE_PATH = os.path.join(os.path.dirname(__file__), "fixtures", "sample_schedule.xlsx")
+FIXTURES_DIR  = os.path.join(os.path.dirname(__file__), "fixtures")
+FIXTURE_XLSX  = os.path.join(FIXTURES_DIR, "sample_schedule.xlsx")
+FIXTURE_CONTACTS = os.path.join(FIXTURES_DIR, "contacts.json")
 
+os.makedirs(FIXTURES_DIR, exist_ok=True)
+
+# --- XLSX fixture ---
 wb = openpyxl.Workbook()
+ws = wb.active
+ws.title = "Schedule"
 
-# Sheet 1 — Schedule
-ws1 = wb.active
-ws1.title = "Schedule"
-ws1.append(["shift_date", "employee_name", "duty_type"])
-ws1.append(["31-03-2026", "Alice Kovalenko", "Night"])
-ws1.append(["01-04-2026", "Bob Petrenko",    "Day"])
-ws1.append(["01-04-2026", "Carol Melnyk",    "Night"])
-ws1.append(["02-04-2026", "Alice Kovalenko", "Day"])
-ws1.append(["02-04-2026", "Dan Sydorenko",   "24h"])
+# Rows 1-5: title block (mirrors real XLSX structure)
+ws.append(["Графік чергувань — Квітень 2026"])
+ws.append([])
+ws.append([])
+ws.append([])
+ws.append([])
 
-# Sheet 2 — Employee Registry
-ws2 = wb.create_sheet("Employee Registry")
-ws2.append(["employee_name", "role", "messenger", "contact_id"])
-ws2.append(["Alice Kovalenko", "Nurse",  "telegram", "111111"])
-ws2.append(["Bob Petrenko",    "Doctor", "telegram", "222222"])
-ws2.append(["Carol Melnyk",    "Nurse",  "viber",    "333333"])
-ws2.append(["Dan Sydorenko",   "Doctor", "telegram", "444444"])
+# Row 6: column headers
+ws.append([
+    "Дата",
+    "Day-type",
+    "Приймальне відділення",
+    "Анестезіологія",
+    "Ургенція спеціалістів на дому",   # present but skipped in POC
+])
 
-wb.save(FIXTURE_PATH)
-print(f"Fixture created: {FIXTURE_PATH}")
+# Row 7+: data rows
+# date        day_type  Приймальне           Анестезіологія   Ургенція
+ws.append(["31-03-2026", "holiday", "Alice Kovalenko",  None,            None])
+ws.append(["01-04-2026", "labor",   "Bob Petrenko",     "Carol Melnyk",  None])
+ws.append(["02-04-2026", "labor",   "Alice Kovalenko",  "Dan Sydorenko", None])
+
+wb.save(FIXTURE_XLSX)
+print(f"XLSX fixture created: {FIXTURE_XLSX}")
+
+# --- contacts.json fixture ---
+contacts = [
+    {"name": "Alice Kovalenko", "channels": {"telegram": "111111"}, "primary_channel": "telegram"},
+    {"name": "Bob Petrenko",    "channels": {"telegram": "222222"}, "primary_channel": "telegram"},
+    {"name": "Carol Melnyk",    "channels": {"viber":    "333333"}, "primary_channel": "viber"},
+    {"name": "Dan Sydorenko",   "channels": {"telegram": "444444"}, "primary_channel": "telegram"},
+]
+
+with open(FIXTURE_CONTACTS, "w", encoding="utf-8") as f:
+    json.dump(contacts, f, ensure_ascii=False, indent=2)
+
+print(f"Contacts fixture created: {FIXTURE_CONTACTS}")

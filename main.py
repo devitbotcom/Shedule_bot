@@ -28,7 +28,7 @@ def setup_logging(log_dir: str) -> None:
 def _fmt_colleague(shift) -> str:
     if shift is None:
         return "-"
-    return f"{shift.employee_name} ({shift.role}) — {shift.duty_type} {shift.shift_date}"
+    return f"{shift.employee_name} ({shift.department}) — {shift.shift_date}"
 
 
 def run_health(config: dict) -> None:
@@ -48,7 +48,7 @@ def run_health(config: dict) -> None:
     # XLSX
     shifts = []
     try:
-        shifts = parse_schedule(config["XLSX_PATH"], config["LOCATION_DEFAULT"])
+        shifts = parse_schedule(config["XLSX_PATH"], config["CONTACTS_PATH"])
         dates = sorted({s.shift_date for s in shifts})
         employees = len({s.employee_name for s in shifts})
         print(f"[XLSX]    ✅ schedule.xlsx found — {employees} employees, {len(dates)} shift dates")
@@ -78,7 +78,7 @@ def run_health(config: dict) -> None:
 
 
 def run_dry_run(config: dict) -> None:
-    shifts = parse_schedule(config["XLSX_PATH"], config["LOCATION_DEFAULT"])
+    shifts = parse_schedule(config["XLSX_PATH"], config["CONTACTS_PATH"])
     contexts = compute_contexts(shifts)
 
     print(f"\n{'='*60}")
@@ -87,8 +87,8 @@ def run_dry_run(config: dict) -> None:
 
     for ctx in contexts:
         s = ctx.shift
-        print(f"  Employee : {s.employee_name} ({s.role})")
-        print(f"  Duty     : {s.duty_type}  |  Date: {s.shift_date}")
+        print(f"  Employee : {s.employee_name}")
+        print(f"  Dept     : {s.department}  |  Day type: {s.day_type}  |  Date: {s.shift_date}")
         print(f"  Messenger: {s.messenger}  |  Contact: {s.contact_id}")
         print(f"  Prev     : {_fmt_colleague(ctx.prev_colleague)}")
         print(f"  Next     : {_fmt_colleague(ctx.next_colleague)}")
@@ -98,7 +98,7 @@ def run_dry_run(config: dict) -> None:
 
 
 def run_reload_schedule(config: dict, dry_run: bool) -> None:
-    shifts = parse_schedule(config["XLSX_PATH"], config["LOCATION_DEFAULT"])
+    shifts = parse_schedule(config["XLSX_PATH"], config["CONTACTS_PATH"])
     dates = sorted({s.shift_date for s in shifts})
 
     if dry_run:
