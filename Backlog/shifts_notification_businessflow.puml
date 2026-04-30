@@ -23,16 +23,17 @@ Staff -> Source : читає свій озклад
 
 Bot -> Messenger : команда на розсилку
 Messenger -> Staff : Надсилає сповіщення за розкладом
+Staff -> Messenger : Підтверджує зміну**
 alt
-Staff -> Messenger : сповіщає про проблему в розкладі
+Staff -> Messenger : сповіщає про проблему в розкладі*
 Messenger -> Head
 end
 alt
-Staff -> Messenger : сповіщає про проблему зі зміною
+Staff -> Messenger : сповіщає про проблему зі зміною*
 Messenger -> Head
 end
 alt
-Staff -> Messenger : запитує про свій розклад
+Staff -> Messenger : запитує про свій розклад*
 end
 
 
