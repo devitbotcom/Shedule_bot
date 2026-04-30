@@ -32,15 +32,26 @@ Deliver `--production` mode. The Owner runs one command and all duty doctors for
 
 ## Key Architectural Decisions
 
-### AD-001 — Date filter in `run_production()` (resolves BUG-003)
+### AD-001 — Date filter in `run_production()` (resolves BUG-003; amended for BUG-005)
 
 **Problem:** `parse_schedule()` returns all shifts from the full month XLSX. Without filtering, `--production` sends all month's notifications at once.
 
-**Decision:** `run_production()` filters shifts to `shift_date == today` before sending. The server date at execution time is used. Deduplication remains as the secondary guard against double-sends if cron fires twice.
+**Decision:** `run_production()` filters **contexts** (not input shifts) to `shift_date == today` after `compute_contexts()` runs. `compute_contexts()` must receive the full month's shifts so prev/next colleagues across date boundaries are correctly resolved. The date filter governs what is **sent**, not what is used for context computation.
+
+**Correct `run_production()` flow:**
+1. `all_shifts = parse_schedule(...)` — full month, unfiltered
+2. `all_contexts = compute_contexts(all_shifts)` — prev/next resolved across full month
+3. `contexts = [c for c in all_contexts if c.shift.shift_date == target_date]` — date filter on contexts
+4. Apply `--employee` filter if present (consistent with AD-004)
+5. Send
+
+This is the same principle as AD-004: filter the output of `compute_contexts()`, never the input.
 
 **CLI override:** `--date YYYY-MM-DD` added as optional flag. If omitted, defaults to today. Allows IT to manually trigger for a specific date (e.g. after a failed cron run on a past date).
 
 **Interaction with `--reload-schedule`:** Unchanged — clears dedup for all dates in the XLSX. After reload, next `--production` run sends for today only.
+
+**Amendment note:** Original decision said "filters shifts before sending" — BUG-005 (UAT) revealed this was implemented as filtering before `compute_contexts()`, breaking next_colleague resolution. Corrected above.
 
 ---
 
@@ -141,8 +152,9 @@ Failure sets `all_ok = False` → exit 1. Requires a real token — placeholder 
 - `health_check()` — returns `bool`, never raises
 
 ### `run_production(config, run_mode)`
-- Filters to `run_mode.date` (default: today)
-- Applies `--employee` filter after `compute_contexts()`
+- Calls `compute_contexts(all_shifts)` on full month — never pre-filters input
+- Filters resulting contexts to `run_mode.date` (default: today)
+- Applies `--employee` filter after date filter
 - Bypasses dedup if `run_mode.force`
 - Exits 0 if `failed == 0`, exits 1 otherwise
 

@@ -2,7 +2,7 @@
 **Sprint:** 003  
 **Role:** QA Engineer  
 **Date:** 2026-04-30 (re-review after Developer fixes)  
-**Status:** ✅ PASS — all bugs and findings resolved. Ready for Owner UAT.  
+**Status:** ❌ FAIL — BUG-005 found during Owner UAT. Escalated to Architect.  
 **Dev ref:** [`20260430_Sprint003_DEV_ShiftNotificationBot.md`](20260430_Sprint003_DEV_ShiftNotificationBot.md)  
 **Arch ref:** [`20260430_Sprint003_ARCH_ShiftNotificationBot.md`](20260430_Sprint003_ARCH_ShiftNotificationBot.md)
 
@@ -113,6 +113,35 @@ All four bugs from the first QA pass (BUG-001 through BUG-004) are fixed and ver
 
 ---
 
+## Finding — BUG-005 — "Наступна зміна" always shows "-" in production (Severity: Critical)
+
+**Found during:** Owner UAT — `20260430_Sprint003_UAT_ShiftNotificationBot.md` item 003-1
+
+**STR:** XLSX contains shifts for 2026-04-30 (today) and 2026-05-01 (tomorrow, same departments). Run `--production --force` for today.
+
+**Actual:** All three today's messages show `Наступна зміна: -`. Tomorrow's doctor is not shown.
+
+**Expected:** Next shift line shows tomorrow's doctor from the same department column.
+
+**Root cause:** `run_production()` applies the date filter (`shift_date == target_date`) **before** calling `compute_contexts()`. `compute_contexts()` therefore receives only today's shifts — it has no tomorrow's shifts to assign as `next_colleague`. The filter is correct for determining which messages to **send**, but it must not strip the data needed for context computation.
+
+**Relevant code — `main.py`:**
+```python
+shifts = [s for s in all_shifts if s.shift_date == target_date]  # strips tomorrow
+...
+contexts = compute_contexts(shifts)   # next_colleague always None
+```
+
+**Architectural decision required:** `compute_contexts()` must receive a wider window than today only. Two options:
+- A) Compute contexts on `all_shifts` (full month), then filter the resulting contexts list to today for sending.
+- B) Compute contexts on today + adjacent dates only (day before, day after).
+
+QA recommends Option A — simpler, consistent with how BUG-002 was resolved. Escalating to Architect.
+
+**Status:** ❌ Open — Architect to decide, Developer to fix.
+
+---
+
 ## Open Tech Debt (Accepted by Developer)
 
 | ID     | Description                                                                               | Severity | Status   |
@@ -163,5 +192,5 @@ Tests import `_format_message` from `main`. Works because `main.py` has no impor
 | Role        | Name | Date       | Status                                        |
 |-------------|------|------------|-----------------------------------------------|
 | Developer   | AI   | 2026-04-30 | ✅                                             |
-| QA Engineer | AI   | 2026-04-30 | ✅ PASS — all findings resolved, ready for UAT |
+| QA Engineer | AI   | 2026-04-30 | ❌ FAIL — BUG-005 found in UAT, escalated to Architect |
 | **Owner**   |      |            | ⏸ Awaiting UAT                                |
