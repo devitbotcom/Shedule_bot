@@ -22,6 +22,8 @@ Thumbs.db
 key.properties
 
 *.png
+*.xlsx
+*.xlsx#
 
 # Python
 .venv/

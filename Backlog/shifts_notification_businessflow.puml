@@ -1,0 +1,41 @@
+@startuml
+' duty-shift.puml
+title Business flow
+
+actor "Начмед" as CMO
+actor "Зав." as Head
+actor "Staff" as Staff
+participant "Розклад" as Source
+actor "IT" as IT
+participant "Бот розсилка" as Bot
+participant "Месенжер" as Messenger
+
+CMO <-> Head : Складають розклад
+Head -> IT : надає список \nконтактів
+
+Head -> IT : надає затверджений \nрозклад
+IT -> Messenger : Вносить налаштування (POC)
+CMO -> Source : Публікує розклад
+
+
+
+Staff -> Source : читає свій озклад
+
+Bot -> Messenger : команда на розсилку
+Messenger -> Staff : Надсилає сповіщення за розкладом
+alt
+Staff -> Messenger : сповіщає про проблему в розкладі
+Messenger -> Head
+end
+alt
+Staff -> Messenger : сповіщає про проблему зі зміною
+Messenger -> Head
+end
+alt
+Staff -> Messenger : запитує про свій розклад
+end
+
+
+
+
+@enduml
