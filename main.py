@@ -12,7 +12,7 @@ from db import (
 )
 from messenger.telegram_adapter import TelegramAdapter
 from models import RunMode, ShiftContext
-from schedule_parser import parse_schedule
+from schedule_parser import parse_schedule, load_mapping
 from shift_logic import compute_contexts
 
 
@@ -31,8 +31,18 @@ def setup_logging(log_dir: str) -> None:
     )
 
 
+_DEFAULT_SHIFT_HOURS = {"labor": "17:00", "holiday": "09:00", "other": "09:00"}
+
+
 def _mapping_path(config: dict) -> str:
     return os.path.join(os.path.dirname(config["XLSX_PATH"]), "schedule_mapping.json")
+
+
+def _shift_hours(config: dict) -> dict:
+    mapping = load_mapping(_mapping_path(config))
+    hours = dict(_DEFAULT_SHIFT_HOURS)
+    hours.update(mapping.get("shift_hours", {}))
+    return hours
 
 
 def _fmt_colleague(shift) -> str:
@@ -41,15 +51,18 @@ def _fmt_colleague(shift) -> str:
     return f"{shift.employee_name} ({shift.department}) — {shift.shift_date}"
 
 
-def _format_message(ctx: ShiftContext) -> str:
+def _format_message(ctx: ShiftContext, shift_hours: dict) -> str:
     s = ctx.shift
     date_display = datetime.strptime(s.shift_date, "%Y-%m-%d").strftime("%d-%m-%Y")
-    prev_name = ctx.prev_colleague.employee_name if ctx.prev_colleague else "-"
+
+    # BUG-001: strip trailing period to avoid double period for names like "А.С."
+    raw_prev = ctx.prev_colleague.employee_name if ctx.prev_colleague else "-"
+    prev_name = raw_prev.rstrip(".")
 
     if ctx.next_colleague:
         n = ctx.next_colleague
         next_date = datetime.strptime(n.shift_date, "%Y-%m-%d").strftime("%d-%m-%Y")
-        next_time = "17:00" if n.day_type == "labor" else "09:00"
+        next_time = shift_hours.get(n.day_type, "09:00")
         next_line = f"{next_date} о {next_time} — {n.employee_name}"
     else:
         next_line = "-"
@@ -119,6 +132,7 @@ def run_health(config: dict) -> None:
 def run_dry_run(config: dict) -> None:
     shifts = parse_schedule(config["XLSX_PATH"], config["TELEGRAM_GROUP_CHAT_ID"], _mapping_path(config))
     contexts = compute_contexts(shifts)
+    hours = _shift_hours(config)
 
     print(f"\n{'='*60}")
     print(f"DRY RUN — {len(contexts)} shifts found. No messages will be sent.")
@@ -132,7 +146,7 @@ def run_dry_run(config: dict) -> None:
         print(f"  Prev     : {_fmt_colleague(ctx.prev_colleague)}")
         print(f"  Next     : {_fmt_colleague(ctx.next_colleague)}")
         print(f"  --- Message preview ---")
-        print(_format_message(ctx))
+        print(_format_message(ctx, hours))
         print()
 
     sys.exit(0)
@@ -156,17 +170,27 @@ def run_reload_schedule(config: dict, dry_run: bool) -> None:
 
 
 def run_production(config: dict, run_mode: RunMode) -> None:
-    shifts = parse_schedule(config["XLSX_PATH"], config["TELEGRAM_GROUP_CHAT_ID"], _mapping_path(config))
+    from datetime import date as _date
+    target_date = run_mode.date or _date.today().strftime("%Y-%m-%d")
 
+    all_shifts = parse_schedule(config["XLSX_PATH"], config["TELEGRAM_GROUP_CHAT_ID"], _mapping_path(config))
+
+    # BUG-003: filter to today's date only — XLSX contains full month
+    shifts = [s for s in all_shifts if s.shift_date == target_date]
+    if not shifts:
+        print(f"[PRODUCTION] No shifts found for date: {target_date}")
+        sys.exit(0)
+
+    # BUG-002: compute prev/next on full date's shifts, then apply employee filter
+    contexts = compute_contexts(shifts)
     if run_mode.employee:
-        shifts = [s for s in shifts if s.employee_name == run_mode.employee]
-        if not shifts:
-            print(f"[PRODUCTION] No shifts found for employee: {run_mode.employee}")
+        contexts = [c for c in contexts if c.shift.employee_name == run_mode.employee]
+        if not contexts:
+            print(f"[PRODUCTION] No shifts found for employee: {run_mode.employee} on {target_date}")
             sys.exit(1)
 
-    contexts = compute_contexts(shifts)
     adapter = TelegramAdapter(config["TELEGRAM_BOT_TOKEN"])
-
+    hours = _shift_hours(config)
     sent = skipped = failed = 0
 
     for ctx in contexts:
@@ -177,7 +201,7 @@ def run_production(config: dict, run_mode: RunMode) -> None:
             skipped += 1
             continue
 
-        message = _format_message(ctx)
+        message = _format_message(ctx, hours)
         try:
             adapter.send(s.contact_id, message)
             record_notification(config["DB_PATH"], s.employee_name, s.shift_date, s.messenger, "ok")

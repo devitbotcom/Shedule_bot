@@ -79,3 +79,24 @@ def test_dry_run_with_production_exits(capsys):
     with pytest.raises(SystemExit) as exc:
         _parse(["--production", "--dry-run"])
     assert exc.value.code == 2
+
+
+def test_production_date():
+    # IT reruns a missed send for a past date without changing today's cron run
+    mode = _parse(["--production", "--date", "2026-04-28"])
+    assert mode.mode == "production"
+    assert mode.date == "2026-04-28"
+
+
+def test_date_without_production_exits(capsys):
+    # `--date` without `--production` is rejected — date override only makes sense for real sends
+    with pytest.raises(SystemExit) as exc:
+        _parse(["--date", "2026-04-28"])
+    assert exc.value.code == 2
+
+
+def test_date_invalid_format_exits(capsys):
+    # `--date` with wrong format is rejected immediately rather than failing at runtime
+    with pytest.raises(SystemExit) as exc:
+        _parse(["--production", "--date", "28-04-2026"])
+    assert exc.value.code == 2

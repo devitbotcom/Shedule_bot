@@ -26,7 +26,7 @@ def check_file_freshness(xlsx_path: str, threshold_seconds: int = 60) -> None:
         )
 
 
-def _load_mapping(mapping_path: str) -> dict:
+def load_mapping(mapping_path: str) -> dict:
     if not os.path.exists(mapping_path):
         print(f"[MAPPING] ❌ schedule_mapping.json not found: {mapping_path}")
         print(f"          Copy data/schedule_mapping.json.example → data/schedule_mapping.json and update column names.")
@@ -43,6 +43,12 @@ def _load_mapping(mapping_path: str) -> dict:
     if missing:
         print(f"[MAPPING] ❌ schedule_mapping.json missing keys: {', '.join(sorted(missing))}")
         sys.exit(1)
+
+    import re
+    for day_type, time_val in m.get("shift_hours", {}).items():
+        if not re.match(r"^\d{2}:\d{2}$", str(time_val)):
+            print(f"[MAPPING] ❌ shift_hours.{day_type}: invalid time format '{time_val}' — expected HH:MM")
+            sys.exit(1)
 
     return m
 
@@ -78,7 +84,7 @@ def _parse_date(raw: object, context: str) -> str | None:
 
 def parse_schedule(xlsx_path: str, group_chat_id: str, mapping_path: str) -> list[Shift]:
     check_file_freshness(xlsx_path)
-    mapping = _load_mapping(mapping_path)
+    mapping = load_mapping(mapping_path)
 
     header_row    = mapping["header_row"]
     hdr_date      = mapping["date_column"]

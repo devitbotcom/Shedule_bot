@@ -50,6 +50,11 @@ mapping = {
         "Приймальне відділення",
         "Анестезіологія",
     ],
+    "shift_hours": {
+        "labor":   "17:00",
+        "holiday": "09:00",
+        "other":   "09:00",
+    },
 }
 
 with open(FIXTURE_MAPPING, "w", encoding="utf-8") as f:

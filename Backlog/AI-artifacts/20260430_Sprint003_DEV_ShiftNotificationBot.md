@@ -3,14 +3,14 @@
 **Role:** Developer  
 **Date:** 2026-04-30  
 **Status:** ⏳ DEV complete — awaiting QA + Owner UAT  
-**Arch ref:** [`20260405_Sprint002_ARCH_ShiftNotificationBot.md`](20260405_Sprint002_ARCH_ShiftNotificationBot.md) (S003 scope defined in Development Plan + CR-001)  
+**Arch ref:** [`20260430_Sprint003_ARCH_ShiftNotificationBot.md`](20260430_Sprint003_ARCH_ShiftNotificationBot.md)  
 **Plan ref:** [`2026-04-30_Development_Plan.md`](../2026-04-30_Development_Plan.md)
 
 ---
 
 ## Scope
 
-Implement Telegram adapter and production orchestrator. One plain-text message per shift sent to the shared group chat. Deduplication via SQLite. `--employee` and `--force` flags wired.
+Implement Telegram adapter and production orchestrator. One plain-text message per shift sent to the shared group chat. Deduplication via SQLite. `--employee`, `--force`, and `--date` flags wired. Bug fixes BUG-001–004 applied. Configurable shift hours (AD-006).
 
 Message format (from PRL):
 ```
@@ -20,52 +20,71 @@ Message format (from PRL):
 Наступна зміна:
 DD-MM-YYYY о HH:MM — {next_name}
 ```
-- `next_time`: `17:00` for `labor`, `09:00` for `holiday` / `other`
+- `next_time`: driven by `shift_hours` in `schedule_mapping.json`; defaults: `17:00` (labor), `09:00` (holiday/other)
 - Missing prev/next: `"-"` substituted, line not omitted
 
 ---
 
 ## Deliverables — Files Changed
 
-| File | Change | Status |
-|------|--------|--------|
-| `messenger/telegram_adapter.py` | Full implementation — `send()` + `health_check()` | ✅ |
-| `main.py` | Added `_format_message()`, `run_production()`; wired `--employee`, `--force`; Telegram health check in `run_health()` | ✅ |
-| `tests/test_telegram_adapter.py` | New — 6 unit tests, all mocked | ✅ |
-| `tests/test_format_message.py` | New — 9 unit tests covering template and edge cases | ✅ |
-| `README.md` | Added steps 5–9 for IT Owner; expanded CLI reference; "Coming next" updated to S004 | ✅ |
-| `Backlog/2026-04-30_Development_Plan.md` | S002 → ✅ Done; S003 → ⏳ DEV complete | ✅ |
+| File                                     | Change                                                                                                                                        | Status  |
+|------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| `messenger/telegram_adapter.py`          | Full implementation — `send()` + `health_check()`                                                                                             | ✅       |
+| `main.py`                                | `_format_message(ctx, shift_hours)`, `_shift_hours()`, `run_production()`; BUG-001/002/003/004 fixed; Telegram health check in `run_health()` | ✅       |
+| `models.py`                              | `date: Optional[str] = None` added to `RunMode`                                                                                               | ✅       |
+| `cli.py`                                 | `--date YYYY-MM-DD` flag added with format validation; requires `--production`                                                                | ✅       |
+| `schedule_parser.py`                     | `_load_mapping` → `load_mapping` (public); `shift_hours` HH:MM validation; `_DAY_TYPE_ALIASES` for British spelling                           | ✅       |
+| `data/schedule_mapping.json.example`     | `shift_hours` block added                                                                                                                     | ✅       |
+| `tests/test_telegram_adapter.py`         | New — 6 unit tests, all mocked                                                                                                                | ✅       |
+| `tests/test_format_message.py`           | New — 11 unit tests; HOURS dict param; BUG-001 regression + custom hours tests                                                                | ✅       |
+| `tests/test_cli.py`                      | 3 tests added: `--date` happy path, missing `--production`, invalid format                                                                    | ✅       |
+| `tests/create_fixture.py`                | `shift_hours` added to fixture mapping                                                                                                        | ✅       |
+| `README.md`                              | Steps 5–9 for IT Owner; expanded CLI reference; "Coming next" updated to S004                                                                 | ✅       |
+| `Backlog/2026-04-30_Development_Plan.md` | S002 → ✅ Done; S003 → ⏳ DEV complete                                                                                                          | ✅       |
 
 ---
 
 ## Implementation Notes
 
 **`messenger/telegram_adapter.py` — REST adapter**  
-`send()` POSTs to `sendMessage` endpoint; raises on HTTP error or `ok: false` API response. `health_check()` calls `getMe`; returns `False` on any failure (never raises) — safe to call from health check without crashing. Timeout: 10 seconds on all requests.
+`send()` POSTs to `sendMessage` endpoint; raises on HTTP error or `ok: false` API response. `health_check()` calls `getMe`; returns `False` on any failure (never raises). Timeout: 10 seconds on all requests.
 
-**`main.py` — `_format_message(ctx)`**  
-Pure function. Converts ISO date to `DD-MM-YYYY` for display. Determines `next_time` from `next_colleague.day_type`. Returns full Ukrainian message string. No I/O.
+**`main.py` — `_format_message(ctx, shift_hours)`**  
+Pure function. Converts ISO date to `DD-MM-YYYY` for display. Looks up `next_time` from `shift_hours[day_type]`. BUG-001: `rstrip(".")` on prev name prevents double period when initials end with `.`.
+
+**`main.py` — `_shift_hours(config)`**  
+Loads `schedule_mapping.json`, merges `shift_hours` block over `_DEFAULT_SHIFT_HOURS`. IT can override per day type without touching code.
 
 **`main.py` — `run_production(config, run_mode)`**  
-Iterates `ShiftContext` list. Skips already-notified shifts unless `--force`. Records each send attempt (ok/fail) in SQLite regardless of outcome — failed sends are retryable on next run. Sleeps 1 second between sends (Telegram rate limit: 1 msg/sec per chat). Exits 0 if zero failures, exits 1 if any failure.
+BUG-003 fix: filters all_shifts to `shift_date == target_date` before processing — XLSX contains full month, cron sends only for the current date (or `--date` override). BUG-002 fix: `compute_contexts()` runs on the full date's shifts before the `--employee` filter is applied, so prev/next colleagues are resolved correctly. BUG-004: `time.sleep(1)` between sends (Telegram rate limit). Exits 0 if zero failures, exits 1 if any failure.
 
-**`main.py` — `run_health()` — Telegram check added**  
-Calls `TelegramAdapter.health_check()`. Adds `[TELEGRAM] ✅/❌` line to health output. Failure marks `all_ok = False`.
+**`cli.py` — `--date` flag**  
+Accepts `YYYY-MM-DD`; validated at parse time via `datetime.strptime`. Rejected unless `--production` is also present.
 
-**`run_production` — `--employee` filter**  
-Applied before `compute_contexts()` — context (prev/next) is computed only within the filtered set. If no shifts found for the named employee, exits 1 with a clear message.
-
-**`run_production` — `--force` flag**  
-Bypasses `was_notified()` check. Still records every send attempt in DB.
+**`schedule_parser.py` — `load_mapping()`**  
+Made public (removed underscore prefix) so `main.py` can call it directly for `shift_hours`. Validates all `shift_hours` values match `HH:MM` regex. Normalises British spelling `labour` → `labor`.
 
 ---
 
-## Known Issues
+## Bug Fixes Applied
 
-| # | Description                                                                                      | Severity  | Decision                                               |
-|---|--------------------------------------------------------------------------------------------------|-----------|--------------------------------------------------------|
-| 1 | Double period in message when staff name ends with `.` (e.g. `"А.С."`) — output: `замість А.С..` | Minor     | NTD — fix in message formatter before S003 UAT         |
-| 2 | Date column returns integer `1` for real XLSX (day-of-month format not yet supported)            | Medium    | NTD — Owner confirmed acceptable for now (UAT note #3) |
+| Bug | Description | Fix |
+|-----|-------------|-----|
+| BUG-001 | Double period for names ending with `.` (e.g. `А.С..`) | `raw_prev.rstrip(".")` before inserting into template |
+| BUG-002 | `--employee` filter applied before `compute_contexts()` — wrong prev/next | Filter moved to after `compute_contexts()` |
+| BUG-003 | `run_production()` sent all month's shifts, not just today | Filter `all_shifts` to `shift_date == target_date` |
+| BUG-004 | No rate limiting between Telegram sends | `time.sleep(1)` after each successful send |
+
+---
+
+## Tech Debt
+
+| # | Description | Severity | Decision |
+|---|-------------|----------|----------|
+| TD-001 | `run_production()` orchestrator has no tests (dedup, send, record, error path) — GAP-001 | Medium | Deferred — requires mock wiring for DB + adapter; low risk given covered unit tests |
+| TD-002 | `--employee` filter behavior not covered by integration test — GAP-002 | Low | Deferred |
+| TD-003 | `--force` flag behavior not covered by test — GAP-003 | Low | Deferred |
+| TD-004 | Date column returns integer `1` for real XLSX (day-of-month format not yet supported) | Medium | NTD — Owner accepted at S002 UAT |
 
 ---
 
@@ -83,7 +102,10 @@ Bypasses `was_notified()` check. Still records every send attempt in DB.
 docker compose build
 docker compose run --rm bot python tests/create_fixture.py
 docker compose run --rm bot pytest
-docker compose run --rm bot python main.py              # health check
-docker compose run --rm bot python main.py --dry-run    # preview messages
-docker compose run --rm bot python main.py --production # send (requires real .env)
+docker compose run --rm bot python main.py                              # health check
+docker compose run --rm bot python main.py --dry-run                   # preview messages
+docker compose run --rm bot python main.py --production                # send for today
+docker compose run --rm bot python main.py --production --date 2026-04-28  # resend past date
+docker compose run --rm bot python main.py --production --employee "Alice" # resend one person
+docker compose run --rm bot python main.py --production --force        # ignore dedup
 ```

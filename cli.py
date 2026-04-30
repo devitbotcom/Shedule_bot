@@ -16,6 +16,8 @@ def parse_args() -> RunMode:
                         help="Bypass deduplication — resend all (requires --production)")
     parser.add_argument("--employee", metavar="NAME",
                         help="Send to one employee only (requires --production)")
+    parser.add_argument("--date", metavar="YYYY-MM-DD",
+                        help="Date to send notifications for (default: today, requires --production)")
     parser.add_argument("--reload-schedule", action="store_true",
                         help="Validate XLSX and clear dedup records for its dates")
 
@@ -27,6 +29,16 @@ def parse_args() -> RunMode:
 
     if args.employee and not args.production:
         parser.error("--employee requires --production")
+
+    if args.date and not args.production:
+        parser.error("--date requires --production")
+
+    if args.date:
+        try:
+            from datetime import datetime
+            datetime.strptime(args.date, "%Y-%m-%d")
+        except ValueError:
+            parser.error(f"--date must be in YYYY-MM-DD format, got: {args.date}")
 
     if args.dry_run and args.production:
         parser.error("--dry-run and --production are mutually exclusive")
@@ -47,6 +59,7 @@ def parse_args() -> RunMode:
     return RunMode(
         mode=mode,
         employee=args.employee,
+        date=args.date,
         force=args.force,
         dry_run=args.dry_run,
     )

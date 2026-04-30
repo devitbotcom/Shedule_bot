@@ -23,5 +23,6 @@ class ShiftContext:
 class RunMode:
     mode: str              # 'health' | 'dry_run' | 'production' | 'reload_schedule'
     employee: Optional[str] = None
+    date: Optional[str] = None     # ISO 8601 override; None = today
     force: bool = False
     dry_run: bool = False
