@@ -31,14 +31,15 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Data directory — IT-managed, never commit real contacts or schedules
+# Data directory — IT-managed, never commit real schedules
 data/*
 !data/.gitkeep
 !data/contacts.json.example
+!data/schedule_mapping.json.example
 
 # Auto-created at runtime
 shift_bot.db
 logs/
 
 # Generated test fixtures — run tests/create_fixture.py once before pytest
-tests/fixtures/contacts.json
+tests/fixtures/

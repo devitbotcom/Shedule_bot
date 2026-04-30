@@ -39,8 +39,8 @@ No stage begins until the previous one is signed off.
 | Sprint | Scope                                                           | P  | Stage | Status                                                 |
 |--------|-----------------------------------------------------------------|----|-------|--------------------------------------------------------|
 | S001   | Architecture — full system design                               | P1 | UAT   | ✅ CLOSED — Owner approved                              |
-| S002   | Foundation: scaffold, config, CLI, DB, XLSX parser, shift logic | P1 | UAT   | ⏳ ARCH✅ DEV✅ QA✅ 35/35 tests pass — awaiting Owner UAT |
-| S003   | Telegram adapter + full orchestrator (main.py)                  | P1 | —     | ⏸ blocked by S002                                      |
+| S002   | Foundation: scaffold, config, CLI, DB, XLSX parser, shift logic | P1 | DEV   | ⏳ ARCH✅ DEV revised (CR-001) — awaiting Docker test run + Owner UAT |
+| S003   | Telegram adapter + full orchestrator (main.py)                  | P1 | —     | ⏸ blocked by S002 UAT                                  |
 | S004   | Production deploy: Namecheap, cron, hardening                   | P1 | —     | ⏸ blocked by S003                                      |
 | S005   | Viber P2: API verification, adapter, staff onboarding           | P2 | —     | ⏸ blocked by S004 + Viber API gate                     |
 | S006   | Multi-ward v2: location column, multi-instance deploy           | v2 | —     | ⏸ future                                               |
@@ -57,10 +57,10 @@ Owner can:
 
 ### S003 — Telegram + Orchestrator
 Owner can:
-- Run `python main.py --production` → all test employees receive correctly formatted Telegram messages
+- Run `python main.py --production` → all shifts receive correctly formatted Telegram messages in the group chat (CR-001: group mode for POC)
 - Verify `notifications` table populated in DB
 - Verify log written to `~/logs/`
-- Run `python main.py --production --employee "Name"` → one person receives message
+- Run `python main.py --production --employee "Name"` → one shift message sent to group
 
 ### S004 — Production Deploy
 Owner can:

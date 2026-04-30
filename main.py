@@ -31,6 +31,10 @@ def _fmt_colleague(shift) -> str:
     return f"{shift.employee_name} ({shift.department}) — {shift.shift_date}"
 
 
+def _mapping_path(config: dict) -> str:
+    return os.path.join(os.path.dirname(config["XLSX_PATH"]), "schedule_mapping.json")
+
+
 def run_health(config: dict) -> None:
     all_ok = True
 
@@ -48,7 +52,7 @@ def run_health(config: dict) -> None:
     # XLSX
     shifts = []
     try:
-        shifts = parse_schedule(config["XLSX_PATH"], config["CONTACTS_PATH"])
+        shifts = parse_schedule(config["XLSX_PATH"], config["TELEGRAM_GROUP_CHAT_ID"], _mapping_path(config))
         dates = sorted({s.shift_date for s in shifts})
         employees = len({s.employee_name for s in shifts})
         print(f"[XLSX]    ✅ schedule.xlsx found — {employees} employees, {len(dates)} shift dates")
@@ -78,7 +82,7 @@ def run_health(config: dict) -> None:
 
 
 def run_dry_run(config: dict) -> None:
-    shifts = parse_schedule(config["XLSX_PATH"], config["CONTACTS_PATH"])
+    shifts = parse_schedule(config["XLSX_PATH"], config["TELEGRAM_GROUP_CHAT_ID"], _mapping_path(config))
     contexts = compute_contexts(shifts)
 
     print(f"\n{'='*60}")
@@ -98,7 +102,7 @@ def run_dry_run(config: dict) -> None:
 
 
 def run_reload_schedule(config: dict, dry_run: bool) -> None:
-    shifts = parse_schedule(config["XLSX_PATH"], config["CONTACTS_PATH"])
+    shifts = parse_schedule(config["XLSX_PATH"], config["TELEGRAM_GROUP_CHAT_ID"], _mapping_path(config))
     dates = sorted({s.shift_date for s in shifts})
 
     if dry_run:

@@ -11,31 +11,8 @@ from models import Shift
 
 logger = logging.getLogger(__name__)
 
-# Row in the XLSX that contains column headers (rows 1-5 are title block)
-HEADER_ROW = 6
-
-# Required column headers — must match XLSX exactly (case-sensitive)
-HDR_DATE     = "Дата"
-HDR_DAY_TYPE = "Day-type"
-
-DEPARTMENT_HEADERS: list[str] = [
-    "Приймальне відділення",
-    "Анестезіологія",
-    "реанімація",
-    "хірургія",
-    "акушерство",
-    "травматологія",
-    "неврологія",
-    "УЗД",
-    "Дитяче відділення",
-]
-
-# Present in XLSX but out of POC scope — parser logs INFO and skips it
-HDR_URGENCIA = "Ургенція спеціалістів на дому"
-
-REQUIRED_HEADERS: list[str] = [HDR_DATE, HDR_DAY_TYPE] + DEPARTMENT_HEADERS
-
 VALID_DAY_TYPES = {"labor", "holiday", "other"}
+_DAY_TYPE_ALIASES = {"labour": "labor"}  # normalize British spelling from XLSX
 
 
 def check_file_freshness(xlsx_path: str, threshold_seconds: int = 60) -> None:
@@ -49,25 +26,25 @@ def check_file_freshness(xlsx_path: str, threshold_seconds: int = 60) -> None:
         )
 
 
-def _load_contacts(contacts_path: str) -> dict[str, dict]:
-    try:
-        with open(contacts_path, encoding="utf-8") as f:
-            entries = json.load(f)
-    except OSError as exc:
-        logger.critical("Cannot open contacts file: %s — %s", contacts_path, exc)
-        print(f"[CONTACTS] ❌ cannot open: {contacts_path}")
+def _load_mapping(mapping_path: str) -> dict:
+    if not os.path.exists(mapping_path):
+        print(f"[MAPPING] ❌ schedule_mapping.json not found: {mapping_path}")
+        print(f"          Copy data/schedule_mapping.json.example → data/schedule_mapping.json and update column names.")
         sys.exit(1)
-    except json.JSONDecodeError as exc:
-        logger.critical("Invalid JSON in contacts file: %s — %s", contacts_path, exc)
-        print(f"[CONTACTS] ❌ invalid JSON: {contacts_path}")
+    try:
+        with open(mapping_path, encoding="utf-8") as f:
+            m = json.load(f)
+    except Exception as exc:
+        print(f"[MAPPING] ❌ cannot parse schedule_mapping.json: {exc}")
         sys.exit(1)
 
-    contacts: dict[str, dict] = {}
-    for entry in entries:
-        name = str(entry.get("name", "")).strip()
-        if name:
-            contacts[name] = entry
-    return contacts
+    required_keys = {"header_row", "date_column", "day_type_column", "department_columns"}
+    missing = required_keys - m.keys()
+    if missing:
+        print(f"[MAPPING] ❌ schedule_mapping.json missing keys: {', '.join(sorted(missing))}")
+        sys.exit(1)
+
+    return m
 
 
 def _build_header_map(sheet, header_row: int) -> dict[str, int]:
@@ -99,8 +76,17 @@ def _parse_date(raw: object, context: str) -> str | None:
         return None
 
 
-def parse_schedule(xlsx_path: str, contacts_path: str) -> list[Shift]:
+def parse_schedule(xlsx_path: str, group_chat_id: str, mapping_path: str) -> list[Shift]:
     check_file_freshness(xlsx_path)
+    mapping = _load_mapping(mapping_path)
+
+    header_row    = mapping["header_row"]
+    hdr_date      = mapping["date_column"]
+    hdr_day_type  = mapping["day_type_column"]
+    dept_headers  = mapping["department_columns"]
+    skip_headers  = mapping.get("skip_columns", [])
+
+    required_headers = [hdr_date, hdr_day_type] + dept_headers
 
     try:
         wb = openpyxl.load_workbook(xlsx_path, data_only=True)
@@ -110,19 +96,18 @@ def parse_schedule(xlsx_path: str, contacts_path: str) -> list[Shift]:
         sys.exit(1)
 
     ws = wb.worksheets[0]
-    header_map = _build_header_map(ws, HEADER_ROW)
-    _require_headers(header_map, REQUIRED_HEADERS)
+    header_map = _build_header_map(ws, header_row)
+    _require_headers(header_map, required_headers)
 
-    if HDR_URGENCIA in header_map:
-        logger.info("Column '%s' found but skipped (out of POC scope)", HDR_URGENCIA)
+    for hdr in skip_headers:
+        if hdr in header_map:
+            logger.info("Column '%s' found but skipped (listed in skip_columns)", hdr)
 
-    contacts = _load_contacts(contacts_path)
     shifts: list[Shift] = []
-    skip_count = 0
 
-    for row in ws.iter_rows(min_row=HEADER_ROW + 1, values_only=True):
-        raw_date     = row[header_map[HDR_DATE] - 1]
-        raw_day_type = row[header_map[HDR_DAY_TYPE] - 1]
+    for row in ws.iter_rows(min_row=header_row + 1, values_only=True):
+        raw_date     = row[header_map[hdr_date] - 1]
+        raw_day_type = row[header_map[hdr_day_type] - 1]
 
         if raw_date is None:
             continue
@@ -132,11 +117,12 @@ def parse_schedule(xlsx_path: str, contacts_path: str) -> list[Shift]:
             continue
 
         day_type = str(raw_day_type or "").strip().lower()
+        day_type = _DAY_TYPE_ALIASES.get(day_type, day_type)
         if day_type not in VALID_DAY_TYPES:
             logger.warning("Unknown day_type '%s' on %s — skipping row", day_type, shift_date)
             continue
 
-        for dept in DEPARTMENT_HEADERS:
+        for dept in dept_headers:
             if dept not in header_map:
                 continue
             cell_value = row[header_map[dept] - 1]
@@ -147,30 +133,13 @@ def parse_schedule(xlsx_path: str, contacts_path: str) -> list[Shift]:
             if not employee_name:
                 continue
 
-            if employee_name not in contacts:
-                logger.warning("'%s' not in contacts.json — skipping", employee_name)
-                skip_count += 1
-                continue
-
-            contact = contacts[employee_name]
-            primary = str(contact.get("primary_channel", "telegram")).strip()
-            channel_id = str(contact.get("channels", {}).get(primary, "")).strip()
-
-            if not channel_id:
-                logger.warning("Empty contact_id for '%s' — skipping", employee_name)
-                skip_count += 1
-                continue
-
             shifts.append(Shift(
                 employee_name=employee_name,
                 department=dept,
                 day_type=day_type,
                 shift_date=shift_date,
-                messenger=primary,
-                contact_id=channel_id,
+                messenger="telegram",
+                contact_id=group_chat_id,
             ))
-
-    if skip_count:
-        logger.warning("Total skipped (no contact match or missing contact_id): %d", skip_count)
 
     return shifts

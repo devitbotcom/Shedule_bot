@@ -9,8 +9,8 @@ REQUIRED_VARS = (
     "XLSX_PATH",
     "DB_PATH",
     "LOG_DIR",
-    "CONTACTS_PATH",
     "TELEGRAM_BOT_TOKEN",
+    "TELEGRAM_GROUP_CHAT_ID",
 )
 
 

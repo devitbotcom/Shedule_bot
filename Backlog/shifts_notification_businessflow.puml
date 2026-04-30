@@ -11,10 +11,9 @@ participant "Бот розсилка" as Bot
 participant "Месенжер" as Messenger
 
 CMO <-> Head : Складають розклад
-Head -> IT : надає список \nконтактів
-
 Head -> IT : надає затверджений \nрозклад
-IT -> Messenger : Вносить налаштування (POC)
+Head -> IT : надає список \nконтактів** (POC2)
+IT -> Messenger : Створює групу, \nдодає бота (POC)
 CMO -> Source : Публікує розклад
 
 

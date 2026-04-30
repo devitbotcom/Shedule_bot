@@ -11,8 +11,8 @@ def _set_env(monkeypatch, overrides: dict):
         "XLSX_PATH": "/tmp/schedule.xlsx",
         "DB_PATH": "/tmp/shift_bot.db",
         "LOG_DIR": "/tmp/logs",
-        "CONTACTS_PATH": "/tmp/contacts.json",
         "TELEGRAM_BOT_TOKEN": "test-token",
+        "TELEGRAM_GROUP_CHAT_ID": "-1001234567890",
     }
     defaults.update(overrides)
     for k, v in defaults.items():
@@ -26,7 +26,7 @@ def test_all_vars_present(monkeypatch):
     _set_env(monkeypatch, {})
     cfg = config_module.load_config()
     assert cfg["XLSX_PATH"] == "/tmp/schedule.xlsx"
-    assert cfg["CONTACTS_PATH"] == "/tmp/contacts.json"
+    assert cfg["TELEGRAM_GROUP_CHAT_ID"] == "-1001234567890"
 
 
 def test_missing_one_var(monkeypatch, capsys):
