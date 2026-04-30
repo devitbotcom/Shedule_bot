@@ -1,11 +1,17 @@
 import logging
 import os
 import sys
+import time
 from datetime import datetime, timezone
 
 from cli import parse_args
 from config import load_config
-from db import get_last_run_summary, get_pending_count, init_db, clear_notifications_for_dates
+from db import (
+    get_last_run_summary, get_pending_count, init_db,
+    clear_notifications_for_dates, was_notified, record_notification,
+)
+from messenger.telegram_adapter import TelegramAdapter
+from models import RunMode, ShiftContext
 from schedule_parser import parse_schedule
 from shift_logic import compute_contexts
 
@@ -25,28 +31,57 @@ def setup_logging(log_dir: str) -> None:
     )
 
 
+def _mapping_path(config: dict) -> str:
+    return os.path.join(os.path.dirname(config["XLSX_PATH"]), "schedule_mapping.json")
+
+
 def _fmt_colleague(shift) -> str:
     if shift is None:
         return "-"
     return f"{shift.employee_name} ({shift.department}) — {shift.shift_date}"
 
 
-def _mapping_path(config: dict) -> str:
-    return os.path.join(os.path.dirname(config["XLSX_PATH"]), "schedule_mapping.json")
+def _format_message(ctx: ShiftContext) -> str:
+    s = ctx.shift
+    date_display = datetime.strptime(s.shift_date, "%Y-%m-%d").strftime("%d-%m-%Y")
+    prev_name = ctx.prev_colleague.employee_name if ctx.prev_colleague else "-"
+
+    if ctx.next_colleague:
+        n = ctx.next_colleague
+        next_date = datetime.strptime(n.shift_date, "%Y-%m-%d").strftime("%d-%m-%Y")
+        next_time = "17:00" if n.day_type == "labor" else "09:00"
+        next_line = f"{next_date} о {next_time} — {n.employee_name}"
+    else:
+        next_line = "-"
+
+    return (
+        f"Зміна: {date_display}\n"
+        f"{s.employee_name} заступає на зміну замість {prev_name}.\n"
+        f"\n"
+        f"Наступна зміна:\n"
+        f"{next_line}"
+    )
 
 
 def run_health(config: dict) -> None:
     all_ok = True
 
-    # CONFIG already validated — always green here
-    print("[CONFIG]  ✅ all variables loaded")
+    print("[CONFIG]   ✅ all variables loaded")
 
     # DB
     try:
         init_db(config["DB_PATH"])
-        print("[DB]      ✅ shift_bot.db reachable, schema valid")
+        print("[DB]       ✅ shift_bot.db reachable, schema valid")
     except Exception as exc:
-        print(f"[DB]      ❌ {exc}")
+        print(f"[DB]       ❌ {exc}")
+        all_ok = False
+
+    # Telegram
+    adapter = TelegramAdapter(config["TELEGRAM_BOT_TOKEN"])
+    if adapter.health_check():
+        print("[TELEGRAM] ✅ bot reachable, token valid")
+    else:
+        print("[TELEGRAM] ❌ bot not reachable or token invalid")
         all_ok = False
 
     # XLSX
@@ -55,12 +90,12 @@ def run_health(config: dict) -> None:
         shifts = parse_schedule(config["XLSX_PATH"], config["TELEGRAM_GROUP_CHAT_ID"], _mapping_path(config))
         dates = sorted({s.shift_date for s in shifts})
         employees = len({s.employee_name for s in shifts})
-        print(f"[XLSX]    ✅ schedule.xlsx found — {employees} employees, {len(dates)} shift dates")
+        print(f"[XLSX]     ✅ schedule.xlsx found — {employees} employees, {len(dates)} shift dates")
     except SystemExit:
-        print("[XLSX]    ❌ see errors above")
+        print("[XLSX]     ❌ see errors above")
         all_ok = False
     except RuntimeError as exc:
-        print(f"[XLSX]    ❌ {exc}")
+        print(f"[XLSX]     ❌ {exc}")
         all_ok = False
 
     # Last run + pending
@@ -73,9 +108,9 @@ def run_health(config: dict) -> None:
 
         if shifts:
             pending = get_pending_count(config["DB_PATH"], shifts)
-            print(f"[PENDING]  {pending} employees pending notification")
+            print(f"[PENDING]  {pending} shifts pending notification")
     except Exception as exc:
-        print(f"[STATS]   ❌ {exc}")
+        print(f"[STATS]    ❌ {exc}")
         all_ok = False
 
     sys.exit(0 if all_ok else 1)
@@ -96,6 +131,8 @@ def run_dry_run(config: dict) -> None:
         print(f"  Messenger: {s.messenger}  |  Contact: {s.contact_id}")
         print(f"  Prev     : {_fmt_colleague(ctx.prev_colleague)}")
         print(f"  Next     : {_fmt_colleague(ctx.next_colleague)}")
+        print(f"  --- Message preview ---")
+        print(_format_message(ctx))
         print()
 
     sys.exit(0)
@@ -118,6 +155,44 @@ def run_reload_schedule(config: dict, dry_run: bool) -> None:
     sys.exit(0)
 
 
+def run_production(config: dict, run_mode: RunMode) -> None:
+    shifts = parse_schedule(config["XLSX_PATH"], config["TELEGRAM_GROUP_CHAT_ID"], _mapping_path(config))
+
+    if run_mode.employee:
+        shifts = [s for s in shifts if s.employee_name == run_mode.employee]
+        if not shifts:
+            print(f"[PRODUCTION] No shifts found for employee: {run_mode.employee}")
+            sys.exit(1)
+
+    contexts = compute_contexts(shifts)
+    adapter = TelegramAdapter(config["TELEGRAM_BOT_TOKEN"])
+
+    sent = skipped = failed = 0
+
+    for ctx in contexts:
+        s = ctx.shift
+
+        if not run_mode.force and was_notified(config["DB_PATH"], s.employee_name, s.shift_date):
+            logging.info("Skip (already notified): %s %s", s.employee_name, s.shift_date)
+            skipped += 1
+            continue
+
+        message = _format_message(ctx)
+        try:
+            adapter.send(s.contact_id, message)
+            record_notification(config["DB_PATH"], s.employee_name, s.shift_date, s.messenger, "ok")
+            logging.info("Sent: %s %s", s.employee_name, s.shift_date)
+            sent += 1
+            time.sleep(1)  # Telegram: max 1 message/second to same chat
+        except Exception as exc:
+            record_notification(config["DB_PATH"], s.employee_name, s.shift_date, s.messenger, "fail", str(exc))
+            logging.error("Failed: %s %s — %s", s.employee_name, s.shift_date, exc)
+            failed += 1
+
+    print(f"[PRODUCTION] sent={sent}  skipped={skipped}  failed={failed}")
+    sys.exit(0 if failed == 0 else 1)
+
+
 def main() -> None:
     run_mode = parse_args()
     config = load_config()
@@ -137,7 +212,8 @@ def main() -> None:
         run_reload_schedule(config, dry_run=run_mode.dry_run)
 
     elif run_mode.mode == "production":
-        raise NotImplementedError("Production mode — implemented in Sprint 003")
+        init_db(config["DB_PATH"])
+        run_production(config, run_mode)
 
 
 if __name__ == "__main__":

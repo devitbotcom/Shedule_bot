@@ -78,8 +78,8 @@ Owner runs `python main.py --production` on the server and:
 | Phase     | Scope                                                                        | Status                       |
 |-----------|------------------------------------------------------------------------------|------------------------------|
 | S001      | Architecture                                                                 | ✅ Done                       |
-| S002      | Foundation: config, CLI, DB, XLSX parser, shift logic + Docker local dev env | ⏳ Awaiting Owner UAT + Docker |
-| S003      | Telegram adapter + orchestrator — group chat, plain text (POC)               | ⏸ Blocked on S002 UAT        |
+| S002      | Foundation: config, CLI, DB, XLSX parser, shift logic + Docker local dev env | ✅ Done — Owner UAT accepted 2026-04-30 |
+| S003      | Telegram adapter + orchestrator — group chat, plain text (POC)               | ⏳ DEV complete — awaiting QA + Owner UAT |
 | S004      | Production deploy: cPanel, cron, hardening                                   | ⏸                            |
 | S005 `*`  | POC2 — group chat + @mention per doctor (needs username contact list)        | ⏸ Post-POC                   |
 | S006 `**` | Personal DMs — individual chat_id per doctor                                 | ⏸ Post-POC                   |

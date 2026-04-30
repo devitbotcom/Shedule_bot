@@ -1,15 +1,38 @@
 import logging
+
+import requests
+
 from messenger.gateway import MessengerGateway
 
 logger = logging.getLogger(__name__)
 
+_TIMEOUT = 10
+
 
 class TelegramAdapter(MessengerGateway):
-    """Telegram REST adapter — implemented in S003."""
+
+    def __init__(self, token: str) -> None:
+        self._token = token
+
+    def _url(self, method: str) -> str:
+        return f"https://api.telegram.org/bot{self._token}/{method}"
 
     def send(self, contact_id: str, message: str) -> None:
-        raise NotImplementedError("TelegramAdapter.send — implemented in Sprint 003")
+        resp = requests.post(
+            self._url("sendMessage"),
+            json={"chat_id": contact_id, "text": message},
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if not data.get("ok"):
+            raise RuntimeError(f"Telegram error: {data.get('description', data)}")
 
     def health_check(self) -> bool:
-        logger.warning("TelegramAdapter not yet implemented (S003)")
-        return False
+        try:
+            resp = requests.get(self._url("getMe"), timeout=_TIMEOUT)
+            resp.raise_for_status()
+            return resp.json().get("ok", False)
+        except Exception as exc:
+            logger.warning("Telegram health check failed: %s", exc)
+            return False

@@ -2,7 +2,7 @@
 **Sprint:** 002  
 **Role:** Developer  
 **Date:** 2026-04-05 (revised 2026-04-30)  
-**Status:** ⏳ REVISED — RED FLAGS resolved, awaiting Docker test run + Owner UAT  
+**Status:** UAT COMPELTE ACCEPTED 
 **Arch ref:** [`20260405_Sprint002_ARCH_ShiftNotificationBot.md`](20260405_Sprint002_ARCH_ShiftNotificationBot.md)  
 **QA ref:** [`20260405_Sprint002_QA_ShiftNotificationBot.md`](20260405_Sprint002_QA_ShiftNotificationBot.md)
 

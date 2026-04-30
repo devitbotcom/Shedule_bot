@@ -76,6 +76,54 @@ All lines should show ✅. If `❌ missing required header: 'X'` appears, open `
 docker compose run --rm bot python main.py --dry-run
 ```
 
+Review the output — each shift block shows the employee name, date, and the exact message that will be sent to the group.
+
+### 6. Send notifications
+
+```bash
+docker compose run --rm bot python main.py --production
+```
+
+Sends one Telegram message per shift to the group. Each message follows this format:
+
+```
+Зміна: 07-04-2026
+Іваненко О.В. заступає на зміну замість Петренко А.С.
+
+Наступна зміна:
+08-04-2026 о 17:00 — Сидоренко В.М.
+```
+
+The bot skips shifts already sent (deduplication) — safe to re-run if cron fires twice.
+
+### 7. Resend for one person
+
+```bash
+docker compose run --rm bot python main.py --production --employee "Іваненко О.В."
+```
+
+Sends only that person's shift notification. Useful if a message was missed or failed.
+
+### 8. Force resend all
+
+```bash
+docker compose run --rm bot python main.py --production --force
+```
+
+Ignores deduplication and resends all shifts. Use after uploading a corrected XLSX.
+
+### 9. Update schedule monthly
+
+When a new monthly XLSX is ready:
+
+1. Copy the new file to `data/schedule.xlsx`
+2. Run `--reload-schedule` to clear the previous month's dedup records:
+   ```bash
+   docker compose run --rm bot python main.py --reload-schedule
+   ```
+3. Run `--dry-run` to verify the new schedule looks correct
+4. Run `--production` to send
+
 ---
 
 ## For Developer
@@ -103,7 +151,9 @@ It collects and runs every file matching tests/test_*.py, prints results, then t
 |----------------------------------------------|--------------------------------------|
 | `python main.py`                             | Health check — config, DB, XLSX      |
 | `python main.py --dry-run`                   | Preview shift data, no sends         |
-| `python main.py --production`                | Send notifications (S003)            |
+| `python main.py --production`                | Send notifications to group          |
+| `python main.py --production --employee "X"` | Send for one employee only           |
+| `python main.py --production --force`        | Resend all, ignore deduplication     |
 | `python main.py --reload-schedule`           | Clear dedup records so cron re-sends |
 | `python main.py --reload-schedule --dry-run` | Preview what would be cleared        |
 
@@ -132,3 +182,9 @@ Shedule_bot/
 ├── requirements.txt
 └── .env.example
 ```
+
+---
+
+## Coming next — S004
+
+Production deploy: Namecheap cPanel setup, cron job configuration, hardening.
