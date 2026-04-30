@@ -10,12 +10,12 @@
 
 Feedback:
 
-### 1 what is next
+### 002-1 what is next
 better to add to the bottom of README.md what is coming next sprint. 
 
-### 2 QA, DEV and Architect 
+### 002-2 QA, DEV and Architect 
 was not solid separation of roles. NTD later how to avoid this.
 
-### 3 date column
+### 002-3 date column
 Actual result - it expects data (acceptable now)
 But in real source file we will have only day of month here. NTD later.

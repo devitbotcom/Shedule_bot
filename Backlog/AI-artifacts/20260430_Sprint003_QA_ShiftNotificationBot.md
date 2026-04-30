@@ -2,7 +2,7 @@
 **Sprint:** 003  
 **Role:** QA Engineer  
 **Date:** 2026-04-30 (re-review after Developer fixes)  
-**Status:** ❌ FAIL — GAP-004 open. Developer must add `shift_hours` to `data/schedule_mapping.json`.  
+**Status:** ✅ PASS — all bugs and findings resolved. Ready for Owner UAT.  
 **Dev ref:** [`20260430_Sprint003_DEV_ShiftNotificationBot.md`](20260430_Sprint003_DEV_ShiftNotificationBot.md)  
 **Arch ref:** [`20260430_Sprint003_ARCH_ShiftNotificationBot.md`](20260430_Sprint003_ARCH_ShiftNotificationBot.md)
 
@@ -65,15 +65,15 @@ All four bugs from the first QA pass (BUG-001 through BUG-004) are fixed and ver
 
 ## New Feature Verification
 
-### AD-006 — Configurable `shift_hours` → ❌ FAIL — GAP-004
+### AD-006 — Configurable `shift_hours` → ✅ PASS
 
 - `schedule_mapping.json.example` updated with `shift_hours` block ✅
+- `data/schedule_mapping.json` updated with `shift_hours` block — GAP-004 fixed ✅
 - `load_mapping()` validates each value against `HH:MM` regex; exits 1 on invalid format ✅
 - `_shift_hours(config)` merges mapping values over built-in defaults — partial override supported ✅
 - `_format_message(ctx, shift_hours)` uses `shift_hours.get(day_type, "09:00")` — unknown day_type falls back safely ✅
 - `test_custom_shift_hours_used` verifies custom labor time overrides default ✅
 - Existing tests updated to pass `HOURS` dict — no calls use stale zero-arg signature ✅
-- `data/schedule_mapping.json` — **`shift_hours` block missing** ❌ — see GAP-004
 
 ### AD-001 — `--date` CLI flag → ✅ PASS
 
@@ -93,9 +93,9 @@ All four bugs from the first QA pass (BUG-001 through BUG-004) are fixed and ver
 
 **Impact:** No runtime error — `_shift_hours()` falls back to `_DEFAULT_SHIFT_HOURS` when the key is absent. However, IT has no visible `shift_hours` entry in their real config file and cannot discover or use the feature without separately consulting the `.example`.
 
-**Fix required:** Add `shift_hours` block with default values to `data/schedule_mapping.json`.
+**Fix:** `shift_hours` block with default values added to `data/schedule_mapping.json`. Verified by file inspection.
 
-**Status:** ❌ Open — Developer to fix.
+**Status:** ✅ Fixed.
 
 ---
 
@@ -107,7 +107,9 @@ All four bugs from the first QA pass (BUG-001 through BUG-004) are fixed and ver
 
 **Severity:** Documentation only. No code defect.
 
-**Recommendation:** Architect to correct Module Contracts entry to `_format_message(ctx: ShiftContext, shift_hours: dict) -> str` before S004.
+**Fix:** ARCH Module Contracts corrected to `_format_message(ctx: ShiftContext, shift_hours: dict) -> str` with note referencing AD-006. ARCH AD-006 scope updated to include `data/schedule_mapping.json`. Verified by file inspection.
+
+**Status:** ✅ Fixed.
 
 ---
 
@@ -161,5 +163,5 @@ Tests import `_format_message` from `main`. Works because `main.py` has no impor
 | Role        | Name | Date       | Status                                        |
 |-------------|------|------------|-----------------------------------------------|
 | Developer   | AI   | 2026-04-30 | ✅                                             |
-| QA Engineer | AI   | 2026-04-30 | ❌ FAIL — GAP-004 open, Developer must fix    |
+| QA Engineer | AI   | 2026-04-30 | ✅ PASS — all findings resolved, ready for UAT |
 | **Owner**   |      |            | ⏸ Awaiting UAT                                |
