@@ -2,7 +2,7 @@
 **Sprint:** 003  
 **Role:** QA Engineer  
 **Date:** 2026-04-30 (re-review after Developer fixes)  
-**Status:** ❌ FAILED — BUG-005 raised, escalated to Architect.  
+**Status:** ACCEPTED 
 **Arch ref:** [`20260430_Sprint003_ARCH_ShiftNotificationBot.md`](20260430_Sprint003_ARCH_ShiftNotificationBot.md)
 **Dev ref:** [`20260430_Sprint003_DEV_ShiftNotificationBot.md`](20260430_Sprint003_DEV_ShiftNotificationBot.md)  
 **QA ref:** [`20260430_Sprint003_QA_ShiftNotificationBot.md`](20260430_Sprint003_DEV_ShiftNotificationBot.md)
