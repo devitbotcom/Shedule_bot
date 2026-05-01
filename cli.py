@@ -18,6 +18,9 @@ def parse_args() -> RunMode:
                         help="Send to one employee only (requires --production)")
     parser.add_argument("--date", metavar="YYYY-MM-DD",
                         help="Date to send notifications for (default: today, requires --production)")
+    parser.add_argument("--shift-type", metavar="TYPE",
+                        help="Only send shifts matching this day_type key from schedule_mapping.json\n"
+                             "(set automatically by gen_crontab.py; requires --production)")
     parser.add_argument("--reload-schedule", action="store_true",
                         help="Validate XLSX and clear dedup records for its dates")
 
@@ -32,6 +35,9 @@ def parse_args() -> RunMode:
 
     if args.date and not args.production:
         parser.error("--date requires --production")
+
+    if args.shift_type and not args.production:
+        parser.error("--shift-type requires --production")
 
     if args.date:
         try:
@@ -60,6 +66,7 @@ def parse_args() -> RunMode:
         mode=mode,
         employee=args.employee,
         date=args.date,
+        shift_type=args.shift_type,
         force=args.force,
         dry_run=args.dry_run,
     )

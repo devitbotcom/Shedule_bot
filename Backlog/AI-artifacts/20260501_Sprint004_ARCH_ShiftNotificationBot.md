@@ -117,6 +117,47 @@ Version pinned to `v0.2.29` (latest stable at time of writing). Developer confir
 
 ---
 
+### AD-S004-007 — Token sanitization in adapter (resolves BUG-S004-001)
+
+**Problem:** `requests` exceptions include the full request URL in the exception message. The URL contains the bot token (`/bot{TOKEN}/sendMessage`). When `run_production()` logs the raw exception, the token is written to the log file and stored in the DB `error` column — violating S001 Security Compliance.
+
+**Decision:** Fix at the `TelegramAdapter` boundary — the only component that knows the URL contains a token. `run_production()` must never receive a token-bearing exception string.
+
+**`send()` contract change:**
+```python
+try:
+    resp = requests.post(...)
+    resp.raise_for_status()
+except requests.exceptions.RequestException as exc:
+    raise RuntimeError(f"Telegram send failed: {type(exc).__name__}") from None
+```
+`from None` suppresses exception chaining — the original (token-bearing) exception is not attached and cannot be logged upstream.
+
+**`health_check()` contract change:**
+```python
+except Exception as exc:
+    logger.warning("Telegram health check failed: %s", type(exc).__name__)
+    return False
+```
+
+No changes required in `run_production()` or `record_notification()` — they will receive a clean message.
+
+---
+
+### AD-S004-008 — Docker DNS (resolves BUG-S004-002)
+
+**Problem:** Both `bot` and `cron` services fail to resolve external hostnames (`api.telegram.org`) from inside Docker containers due to host DNS configuration on this machine.
+
+**Decision:** Add `dns: [8.8.8.8, 8.8.4.4]` to both services in `docker-compose.yml`. Google public DNS bypasses host DNS configuration and is reachable from Docker bridge networks.
+
+---
+
+### AD-S004-009 — Cron service timezone (resolves OBS-002)
+
+**Decision:** Add `TZ: UTC` to the `cron` service environment. Supercronic interprets cron schedule expressions using the container's local timezone. Making it explicit prevents any Docker host timezone from shifting schedule interpretation.
+
+---
+
 ## Developer Deliverables
 
 | # | Deliverable | Notes |
@@ -133,6 +174,59 @@ Version pinned to `v0.2.29` (latest stable at time of writing). Developer confir
 ## Module Contracts — No Changes
 
 All module contracts from S003 ARCH remain valid. No new Python modules introduced in S004.
+
+---
+
+## Design Issue — DI-S004-001: Cron timing vs shift_hours (raised during UAT)
+
+**Raised by:** Owner (UAT 2026-05-01)  
+**Status:** ⏸ Open — deferred to S005
+
+### Observation
+
+The system currently has two places that relate to timing:
+- `crontab` — when the bot fires (07:00 daily, cron syntax, read by supercronic)
+- `data/schedule_mapping.json` → `shift_hours` — shift start times shown in messages
+
+Owner's goal: single source of truth — IT edits only `schedule_mapping.json`.
+
+### Design intent
+
+`shift_hours` should drive cron timing directly. Labour shifts start at 17:00, holiday at 09:00 — the notification fires at those times, not at a fixed 07:00. No separate `notification_time` field is needed.
+
+### Gap identified
+
+Generating two cron entries (09:00 and 17:00) from `shift_hours` is technically straightforward via a startup script (`gen_crontab.py`). However, the current dedup mechanism (employee + date) does not distinguish by day type. With two cron entries firing every day:
+
+- On a holiday day: 09:00 cron fires → sends. 17:00 cron fires → dedup blocks. ✅ correct
+- On a labour day: 09:00 cron fires → sends (wrong time — labour shift is at 17:00). 17:00 cron fires → dedup blocks. ❌ wrong
+
+**Root cause:** The bot has no awareness of current wall-clock time relative to shift type. It sends for today's date regardless of which cron triggered it.
+
+### Resolution required (S005)
+
+To implement this correctly, one of the following is needed:
+
+**Option A — `--shift-type` flag (preferred):** The crontab generator produces:
+```
+0 9  * * *  python /app/main.py --production --shift-type holiday
+0 17 * * *  python /app/main.py --production --shift-type labour
+```
+The bot filters to only send shifts matching the given `--shift-type` on that run. Dedup remains per employee+date+shift_type.
+
+**Option B — time-window filter:** Bot checks whether the current time matches the shift start time from `shift_hours` (±N minutes) and skips if not. No new flag — the bot self-selects.
+
+**Architect preliminary ruling:** Option A is cleaner and more explicit. S005 scope: `gen_crontab.py` startup script + `--shift-type` flag in `main.py` + updated dedup key.
+
+### Current state (S004)
+
+`crontab` remains a static file at `0 7 * * *`. IT must edit it manually if timing changes. This is acceptable for POC — the 07:00 fire gives sufficient advance notice for both shift types (2h for holiday at 09:00, 10h for labour at 17:00).
+
+**Open question for Owner before S005 scoping:**
+
+| # | Question |
+|---|----------|
+| OQ-S004-1 | Should notification fire AT shift start time (17:00 / 09:00), or before it (advance notice)? If before, how many minutes/hours in advance? |
 
 ---
 
@@ -176,6 +270,6 @@ All module contracts from S003 ARCH remain valid. No new Python modules introduc
 | Role      | Name | Date       | Status |
 |-----------|------|------------|--------|
 | Architect | AI   | 2026-05-01 | ✅ APPROVED |
-| Developer |      |            | ⏸ Ready to start |
-| QA        |      |            | ⏸ |
-| Owner     |      |            | ⏸ |
+| Developer | AI   | 2026-05-01 | ✅ |
+| QA        | AI   | 2026-05-01 | ✅ PASS (pass 2) |
+| Owner     |      |            | ⏸ Ready for UAT |

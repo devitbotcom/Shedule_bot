@@ -40,6 +40,7 @@ data/*
 # Auto-created at runtime
 shift_bot.db
 logs/
+crontab.generated
 
 # Generated test fixtures — run tests/create_fixture.py once before pytest
 tests/fixtures/

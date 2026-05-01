@@ -2,6 +2,7 @@ import os
 import sys
 from unittest.mock import MagicMock, patch
 import pytest
+import requests
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from messenger.telegram_adapter import TelegramAdapter
@@ -33,13 +34,36 @@ def test_send_success(adapter):
 
 
 def test_send_raises_on_http_error(adapter):
-    # Network-level error (e.g. 429 Too Many Requests) must propagate as an exception
+    # HTTP error (e.g. 429) is wrapped in a sanitized RuntimeError — no URL or token exposed
     with patch("requests.post") as mock_post:
         resp = _mock_response({}, status_code=429)
-        resp.raise_for_status.side_effect = Exception("429 Too Many Requests")
+        resp.raise_for_status.side_effect = requests.exceptions.HTTPError(
+            "429 Too Many Requests"
+        )
         mock_post.return_value = resp
-        with pytest.raises(Exception, match="429"):
+        with pytest.raises(RuntimeError, match="Telegram send failed"):
             adapter.send("-1001234567890", "Test message")
+
+
+def test_send_raises_on_connection_error(adapter):
+    # DNS/network failure is wrapped in a sanitized RuntimeError — token never appears in message
+    with patch("requests.post", side_effect=requests.exceptions.ConnectionError(
+        "Failed to resolve 'api.telegram.org/botSECRET_TOKEN/sendMessage'"
+    )):
+        with pytest.raises(RuntimeError) as exc_info:
+            adapter.send("-1001234567890", "Test message")
+        assert "SECRET_TOKEN" not in str(exc_info.value)
+        assert "Telegram send failed" in str(exc_info.value)
+
+
+def test_send_token_not_in_exception(adapter):
+    # BUG-S004-001 regression: token must never appear in logged exception string
+    with patch("requests.post", side_effect=requests.exceptions.ConnectionError(
+        "Max retries exceeded with url: /botSECRET_TOKEN/sendMessage"
+    )):
+        with pytest.raises(RuntimeError) as exc_info:
+            adapter.send("-1001234567890", "Test message")
+        assert "SECRET_TOKEN" not in str(exc_info.value)
 
 
 def test_send_raises_on_telegram_api_error(adapter):

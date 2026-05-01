@@ -23,6 +23,7 @@ class ShiftContext:
 class RunMode:
     mode: str              # 'health' | 'dry_run' | 'production' | 'reload_schedule'
     employee: Optional[str] = None
-    date: Optional[str] = None     # ISO 8601 override; None = today
+    date: Optional[str] = None       # ISO 8601 override; None = today
+    shift_type: Optional[str] = None # day_type filter; None = all types (set by gen_crontab)
     force: bool = False
     dry_run: bool = False

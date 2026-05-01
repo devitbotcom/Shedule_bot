@@ -77,17 +77,17 @@ Owner runs `python main.py --production` on the server and:
 
 ## Roadmap
 
-| Phase     | Scope                                                                        | Status                       |
-|-----------|------------------------------------------------------------------------------|------------------------------|
-| S001      | Architecture                                                                 | ✅ Done                       |
-| S002      | Foundation: config, CLI, DB, XLSX parser, shift logic + Docker local dev env | ✅ Done — Owner UAT accepted 2026-04-30 |
+| Phase     | Scope                                                                        | Status                                   |
+|-----------|------------------------------------------------------------------------------|------------------------------------------|
+| S001      | Architecture                                                                 | ✅ Done                                   |
+| S002      | Foundation: config, CLI, DB, XLSX parser, shift logic + Docker local dev env | ✅ Done — Owner UAT accepted 2026-04-30   |
 | S003      | Telegram adapter + orchestrator — group chat, plain text (POC)               | ⏳ DEV complete — awaiting QA + Owner UAT |
-| S004      | Local automation: Docker cron service (supercronic) — hosting deploy deferred to S004b | ⏳ ARCH ✅ — DEV ready to start |
+| S004      | Local automation: Docker cron service (supercronic) — hosting deploy deferred to S004b | ⏳ ARCH ✅ — DEV ready to start            |
 | S004b     | Production deploy: Namecheap cPanel, venv, hardening                         | ⏸ blocked on Owner OQ-1/2/3              |
-| S005 `*`  | POC2 — group chat + @mention per doctor (needs username contact list)        | ⏸ Post-POC                   |
-| S006 `**` | Personal DMs — individual chat_id per doctor                                 | ⏸ Post-POC                   |
-| S007 `**` | Viber P2                                                                     | ⏸ Post-POC                   |
-| S008 `*`  | Multi-ward v2                                                                | ⏸ Future                     |
+| S005 `*`  | POC2 — group chat + @mention per doctor (needs username contact list)        | ⏸ Post-POC                               |
+| S006 `**` | Personal DMs — individual chat_id per doctor                                 | ⏸ Post-POC                               |
+| S007 `**` | Viber P2                                                                     | ⏸ Post-POC                               |
+| S008 `*`  | Multi-ward v2                                                                | ⏸ Future                                 |
 
 ## Quality Levels — POC
 

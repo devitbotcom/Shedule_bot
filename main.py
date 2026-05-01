@@ -184,6 +184,13 @@ def run_production(config: dict, run_mode: RunMode) -> None:
         print(f"[PRODUCTION] No shifts found for date: {target_date}")
         sys.exit(0)
 
+    # Filter by shift_type when set by gen_crontab (e.g. --shift-type labour)
+    if run_mode.shift_type:
+        contexts = [c for c in contexts if c.shift.day_type == run_mode.shift_type]
+        if not contexts:
+            print(f"[PRODUCTION] No {run_mode.shift_type} shifts found for date: {target_date}")
+            sys.exit(0)
+
     # AD-004: apply employee filter after context computation
     if run_mode.employee:
         contexts = [c for c in contexts if c.shift.employee_name == run_mode.employee]

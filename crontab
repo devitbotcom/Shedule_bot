@@ -1,0 +1,11 @@
+# NOTIFICATION DELIVERY TIME — when the bot sends messages (advance notice window).
+# This is infrastructure. Do not change it in normal operation.
+#
+# Shift start times shown IN the message are configured in data/schedule_mapping.json
+# under "shift_hours" — that is the only file IT needs for routine schedule updates.
+#
+# Format: minute hour day-of-month month day-of-week command
+# Default: daily at 07:00 UTC
+# To test:  change to   * * * * *   (fires every minute — dedup prevents duplicate sends)
+#
+0 7 * * * python /app/main.py --production

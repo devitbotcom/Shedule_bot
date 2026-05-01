@@ -3,8 +3,28 @@ services:
     build: .
     volumes:
       - .:/app        # code — edit without rebuild
-      - ./data:/data  # IT-managed files (contacts.json, schedule.xlsx, db, logs) — edit without rebuild
+      - ./data:/data  # IT-managed files (schedule.xlsx, db, logs) — edit without rebuild
     working_dir: /app
     env_file:
       - path: .env
         required: false
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
+  cron:
+    build: .
+    volumes:
+      - .:/app        # code — same as bot service
+      - ./data:/data  # IT-managed files shared with bot
+    working_dir: /app
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - TZ=UTC
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: sh -c "python /app/gen_crontab.py && supercronic /app/crontab.generated"
+    restart: unless-stopped

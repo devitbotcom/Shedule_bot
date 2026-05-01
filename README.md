@@ -1,6 +1,6 @@
 # Shift Schedule Notification Bot
 
-Sends one Telegram message per duty shift to a shared staff group. Runs as a one-shot cron job on Namecheap cPanel (Python 3.11.14).
+Sends one Telegram message per duty shift to a shared staff group. Runs automatically via a Docker cron service locally, or as a cPanel cron job on Namecheap in production.
 
 ---
 
@@ -87,7 +87,7 @@ docker compose run --rm bot python main.py --production
 Sends one Telegram message per shift to the group. Each message follows this format:
 
 ```
-Зміна: 07-04-2026
+Зміна: Приймальне відділення 07-04-2026
 Іваненко О.В. заступає на зміну замість Петренко А.С.
 
 Наступна зміна:
@@ -123,6 +123,43 @@ When a new monthly XLSX is ready:
    ```
 3. Run `--dry-run` to verify the new schedule looks correct
 4. Run `--production` to send
+
+### 10. Local automation (cron service)
+
+Default is to start the cron service once and let it fire automatically.
+
+```bash
+docker compose up -d cron
+```
+
+The cron service runs in the background and restarts automatically if Docker restarts.
+
+**Watch the cron logs:**
+```bash
+docker compose logs -f cron
+```
+
+**Change the schedule:**
+
+Open `crontab` in a text editor. The default is daily at 07:00:
+```
+0 7 * * * python /app/main.py --production
+```
+
+To test immediately, change to every minute (dedup prevents duplicate sends):
+```
+* * * * * python /app/main.py --production
+```
+
+Then apply the change:
+```bash
+docker compose restart cron
+```
+
+**Stop the cron service:**
+```bash
+docker compose stop cron
+```
 
 ---
 
@@ -185,6 +222,6 @@ Shedule_bot/
 
 ---
 
-## Coming next — S004
+## Coming next — S004b
 
-Production deploy: Namecheap cPanel setup, cron job configuration, hardening.
+Production deploy: Namecheap cPanel setup, venv, cron job configuration, hardening.
