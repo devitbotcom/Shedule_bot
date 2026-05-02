@@ -19,10 +19,10 @@ Sends one Telegram message per duty shift to a shared staff group. Runs automati
 1. Create a closed Telegram group and add all staff members.
 2. Add your bot to the group and promote it to Administrator.
 3. Get the group ID — send any message to the group, then open:
-   ```
-   https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
-   ```
-   Find the `"chat"` object and copy the `"id"` (starts with a minus, e.g. `-1001234567890`).
+   
+   [https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates](TG URL with YOUR_BOT_TOKEN)
+   
+Find the `"chat"` object and copy the `"id"` (starts with a minus, e.g. `-1001234567890`).
 
 ### 2. Place data files
 
@@ -59,12 +59,13 @@ Fill in the two values — everything else is pre-set:
 ```
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token-here
 TELEGRAM_GROUP_CHAT_ID=-1001234567890
+TZ=Europe/Kyiv
 ```
 
 ### 4. Build and verify setup
 
 ```bash
-docker compose build
+docker compose build  --no-cache
 docker compose run --rm bot python main.py
 ```
 
@@ -77,52 +78,6 @@ docker compose run --rm bot python main.py --dry-run
 ```
 
 Review the output — each shift block shows the employee name, date, and the exact message that will be sent to the group.
-
-### 6. Send notifications
-
-```bash
-docker compose run --rm bot python main.py --production
-```
-
-Sends one Telegram message per shift to the group. Each message follows this format:
-
-```
-Зміна: Приймальне відділення 07-04-2026
-Іваненко О.В. заступає на зміну замість Петренко А.С.
-
-Наступна зміна:
-08-04-2026 о 17:00 — Сидоренко В.М.
-```
-
-The bot skips shifts already sent (deduplication) — safe to re-run if cron fires twice.
-
-### 7. Resend for one person
-
-```bash
-docker compose run --rm bot python main.py --production --employee "Іваненко О.В."
-```
-
-Sends only that person's shift notification. Useful if a message was missed or failed.
-
-### 8. Force resend all
-
-```bash
-docker compose run --rm bot python main.py --production --force
-```
-
-Ignores deduplication and resends all shifts. Use after uploading a corrected XLSX.
-
-### 9. Update schedule monthly
-
-When a new monthly XLSX is ready:
-
-1. Copy the new file to `data/schedule.xlsx`
-2. Run `--reload-schedule` to clear the previous month's dedup records:
-   ```bash
-   docker compose run --rm bot python main.py --reload-schedule
-   ```
-3. Run `--dry-run` to verify the new schedule looks correct
-4. Run `--production` to send
 
 ### 10. Local automation (cron service)
 
@@ -141,25 +96,74 @@ docker compose logs -f cron
 
 **Change the schedule:**
 
-Open `crontab` in a text editor. The default is daily at 07:00:
-```
-0 7 * * * python /app/main.py --production
-```
+Open `data/schedule_mapping.json` and edit the `shift_hours` section:
 
-To test immediately, change to every minute (dedup prevents duplicate sends):
-```
-* * * * * python /app/main.py --production
-```
+> The cron fires at these times, in the timezone set by `TZ` in your `.env` (e.g. `TZ=Europe/Kyiv`).
+Adding a new shift type or changing a time takes effect after a restarting the cron service — no code change needed.
 
-Then apply the change:
+Apply the change:
 ```bash
-docker compose restart cron
+docker compose up -d cron
 ```
+
+**Verify container time before go-live:**
+```bash
+docker compose run --rm bot python main.py --health
+```
+Check the `[TIMEZONE]` line — the timezone and local time shown must match your wall clock. If the timezone is wrong, update `TZ` in `.env` and restart. If the time itself is wrong, check your system clock and Docker daemon.
 
 **Stop the cron service:**
 ```bash
 docker compose stop cron
 ```
+
+### 9. Update schedule monthly
+
+When a new monthly XLSX is ready:
+
+1. Copy the new file to `data/schedule.xlsx`
+2. Run `--reload-schedule` to clear the previous month's dedup records:
+```bash
+docker compose run --rm bot python main.py --reload-schedule
+```
+
+3. Run `--dry-run` to verify the new schedule looks correct
+4. Run `--production` to send
+
+### 6. Send notifications manually
+
+```bash
+docker compose run --rm bot python main.py --production
+```
+
+Sends one Telegram message per shift to the group. Each message follows this format:
+
+```
+Зміна: Приймальне відділення 07-04-2026
+Іваненко О.В. заступає на зміну замість Петренко А.С.
+
+Наступна зміна:
+08-04-2026 о 17:00 — Сидоренко В.М.
+```
+
+The bot skips shifts already sent (deduplication) — safe to re-run if cron fires twice.
+
+### 7. Resend manually for one person
+
+```bash
+docker compose run --rm bot python main.py --production --employee "Іваненко О.В."
+```
+
+Sends only that person's shift notification. Useful if a message was missed or failed.
+
+### 8. Force resend all manually
+
+```bash
+docker compose run --rm bot python main.py --production --force
+```
+
+Ignores deduplication and resends all shifts. Use after uploading a corrected XLSX.
+
 
 ---
 
@@ -186,7 +190,8 @@ It collects and runs every file matching tests/test_*.py, prints results, then t
 
 | Command                                      | Effect                               |
 |----------------------------------------------|--------------------------------------|
-| `python main.py`                             | Health check — config, DB, XLSX      |
+| `python main.py --health`                    | Health check — config, DB, XLSX, timezone |
+| `python main.py`                             | Same as `--health` (default)         |
 | `python main.py --dry-run`                   | Preview shift data, no sends         |
 | `python main.py --production`                | Send notifications to group          |
 | `python main.py --production --employee "X"` | Send for one employee only           |

@@ -77,34 +77,95 @@ Owner runs `python main.py --production` on the server and:
 
 ## Roadmap
 
-| Phase     | Scope                                                                        | Status                                   |
-|-----------|------------------------------------------------------------------------------|------------------------------------------|
-| S001      | Architecture                                                                 | ✅ Done                                   |
-| S002      | Foundation: config, CLI, DB, XLSX parser, shift logic + Docker local dev env | ✅ Done — Owner UAT accepted 2026-04-30   |
-| S003      | Telegram adapter + orchestrator — group chat, plain text (POC)               | ⏳ DEV complete — awaiting QA + Owner UAT |
-| S004      | Local automation: Docker cron service (supercronic) — hosting deploy deferred to S004b | ⏳ ARCH ✅ — DEV ready to start            |
-| S004b     | Production deploy: Namecheap cPanel, venv, hardening                         | ⏸ blocked on Owner OQ-1/2/3              |
-| S005 `*`  | POC2 — group chat + @mention per doctor (needs username contact list)        | ⏸ Post-POC                               |
-| S006 `**` | Personal DMs — individual chat_id per doctor                                 | ⏸ Post-POC                               |
-| S007 `**` | Viber P2                                                                     | ⏸ Post-POC                               |
-| S008 `*`  | Multi-ward v2                                                                | ⏸ Future                                 |
+| Phase     | Scope                                                                                   | Status                                             |
+|-----------|-----------------------------------------------------------------------------------------|----------------------------------------------------|
+| S001      | Architecture                                                                            | ✅ Done                                             |
+| S002      | Foundation: config, CLI, DB, XLSX parser, shift logic + Docker local dev env            | ✅ Done — Owner UAT accepted 2026-04-30             |
+| S003      | Telegram adapter + orchestrator — group chat, plain text (POC)                          | ✅ Done — Owner UAT accepted 2026-04-30             |
+| S004      | Local automation: Docker cron service (supercronic), dynamic crontab from shift_hours   | ⏳ In progress — UAT paused on NFR-S004-001 (TZ)   |
+| S004b     | Production deploy: Namecheap cPanel, venv, hardening                                    | ⏸ Blocked on Owner OQ-1/2/3                        |
+| S005 `*`  | POC2 — group chat + @mention per doctor (needs username contact list)                   | ⏸ Post-POC                                         |
+| S006 `**` | Personal DMs — individual chat_id per doctor                                            | ⏸ Post-POC                                         |
+| S007 `**` | Viber messenger adapter                                                                  | ⏸ Post-POC                                         |
+| S008 `*`  | Multi-ward v2                                                                           | ⏸ Future                                           |
 
-## Quality Levels — POC
+---
 
-| Characteristic         | Sub-characteristic | POC scope                                                                               | Status      |
-|------------------------|--------------------|-----------------------------------------------------------------------------------------|-------------|
-| Functional suitability | Correctness        | All staff receive correct Telegram message. Verified by Owner UAT.                      | Not started |
-| Reliability            | Fault tolerance    | Graceful error handling on all known failure modes. Exit 0/1. No silent skips.          | Not started |
-| Reliability            | Recoverability     | Log written on every run including failures. SQLite audit trail per send attempt.       | Not started |
-| Performance efficiency | —                  | Not measured — small staff volume, no SLA required.                                     | NA          |
-| Usability              | Operability        | Health check, dry-run, production CLI modes produce human-readable output.              | Not started |
-| Security               | Confidentiality    | No secrets in code or logs. `.env` not in Git. No PII in log output.                     | Not started |
-| Compatibility          | Interoperability   | Standard XLSX (openpyxl), Telegram REST API.                                            | Not started |
-| Maintainability        | Modifiability      | IT updates `.env` (group chat ID) without touching code.                                | Not started |
-| Maintainability        | Testability        | Unit tests cover shift logic, parser, DB layer. No network calls in tests.              | Not started |
-| Maintainability        | Analysability      | SQLite audit log. Log file on every run. CLI health check per component.                | Not started |
-| Portability            | Installability     | One venv install + one cron line. New IT can deploy from README alone.                  | Not started |
-| Portability            | Adaptability       | Local dev env (Docker) + production target (Namecheap cPanel, Python 3.11.14).          | Not started |
+## Quality Characteristics — POC
+
+*Updated 2026-05-01 with primitives discovered during S003–S004.*
+
+| Characteristic         | Sub-characteristic       | Requirement                                                                                        | Discovered / Raised       | Status         |
+|------------------------|--------------------------|----------------------------------------------------------------------------------------------------|---------------------------|----------------|
+| Functional suitability | Correctness              | All staff receive correct Telegram message. Verified by Owner UAT.                                 | S001                      | ✅ S003         |
+| Functional suitability | Completeness             | prev/next colleague resolved across date boundaries — full month context required.                  | BUG-005 (S003)            | ✅ S003         |
+| Reliability            | Fault tolerance          | Graceful error on all known failure modes. Exit 0/1. No silent skips.                              | S001                      | ✅ S003         |
+| Reliability            | Recoverability           | Log written on every run including failures. SQLite audit trail per send attempt.                  | S001                      | ✅ S003         |
+| Reliability            | Schedule correctness     | Cron fires at the time the Maintainer expects — `TZ` must match Maintainer's local timezone.       | NFR-S004-001 (S004 UAT)   | ⏳ S004 D7–D9  |
+| Performance efficiency | —                        | Not measured — small staff volume, no SLA required.                                                | —                         | NA             |
+| Usability              | Operability              | Health check, dry-run, production CLI modes produce human-readable output.                         | S001                      | ✅ S003         |
+| Usability              | Configurability          | IT edits only `data/schedule_mapping.json` for shift timing — no crontab syntax knowledge needed.  | 004-2 (S004 UAT)          | ✅ S004         |
+| Security               | Confidentiality          | No secrets in code or logs. `.env` not in Git. No PII in log output. Token never in exceptions.   | S001 + BUG-S004-001       | ✅ S004         |
+| Compatibility          | Interoperability         | Standard XLSX (openpyxl), Telegram REST API. Adapter pattern isolates messenger dependency.        | S001                      | ✅ S003         |
+| Maintainability        | Modifiability            | IT updates `.env` (group chat ID, timezone) without touching code.                                 | S001 + S004               | ⏳ S004 D8     |
+| Maintainability        | Testability              | Unit tests cover all logic layers. No network calls in tests. Subprocess tests for scripts.        | S001 + QA S004            | ✅ S004         |
+| Maintainability        | Analysability            | SQLite audit log. Timestamped log file on every run. CLI health check per component.              | S001                      | ✅ S003         |
+| Maintainability        | Single source of truth   | `shift_hours` in `schedule_mapping.json` drives both message content and cron schedule.            | 004-2 (S004 UAT)          | ✅ S004         |
+| Portability            | Installability           | `docker compose up -d cron` is the only command IT needs for ongoing operation.                    | S004                      | ✅ S004         |
+| Portability            | Adaptability             | Messenger adapter pattern supports adding Viber (S007) without changes to orchestrator or parser.  | S001 + S004 ext           | ⏸ S007         |
+
+---
+
+## Messenger Extensibility Architecture
+
+*Registered 2026-05-01 — formalises the adapter pattern for future messenger integrations.*
+
+### Current state
+
+| Messenger | Adapter | Sprint | Status |
+|-----------|---------|--------|--------|
+| Telegram  | `messenger/telegram_adapter.py` | S003 | ✅ Live |
+| Viber     | `messenger/viber_adapter.py` | S007 | ⏸ Planned |
+
+### Extension contract
+
+All messenger adapters implement `MessengerGateway` (`messenger/gateway.py`):
+
+```python
+class MessengerGateway:
+    def send(self, contact_id: str, message: str) -> None: ...
+    def health_check(self) -> bool: ...
+```
+
+**Adding a new messenger (e.g. Viber, S007):**
+
+1. Create `messenger/viber_adapter.py` implementing `MessengerGateway`
+2. Add `VIBER_BOT_TOKEN` (or equivalent) to `.env.example` and `config.py`
+3. `Shift.messenger` field routes to the correct adapter at runtime — no changes to parser, shift logic, or DB layer
+4. Token sanitization rule (AD-S004-007) applies to all adapters — never propagate raw network exceptions
+
+**Isolation requirement:** Each adapter catches its own network exceptions and re-raises a sanitized `RuntimeError`. The orchestrator (`run_production()`) must never receive a token-bearing exception string from any adapter.
+
+### Planned: S007 Viber adapter
+
+| Item | Notes |
+|------|-------|
+| `VIBER_BOT_TOKEN` env var | Added to `.env.example` |
+| `messenger/viber_adapter.py` | Implements `send()` and `health_check()` |
+| `contacts.json` re-introduced | Per-person routing: `{"name": ..., "messenger": "viber", "contact_id": ...}` |
+| Dedup key unchanged | employee + date — messenger-agnostic |
+
+---
+
+## Owner Observations Backlog
+
+Issues raised by Owner during UAT that have been resolved or deferred.
+
+| ID    | Sprint | Description | Resolution |
+|-------|--------|-------------|------------|
+| 004-1 | S004   | Logs for review — IT needs to find when feature was used | ✅ Two log locations: `data/logs/` file + `docker compose logs cron`. README to document both. |
+| 004-2 | S004   | Two scheduling configs: `crontab` + `schedule.xlsx` | ✅ Resolved: `shift_hours` in `schedule_mapping.json` now drives cron schedule via `gen_crontab.py`. Single source of truth. |
+| NFR-S004-001 | S004 | Cron time interpreted in UTC, not Maintainer's local timezone | ⏳ In progress: D7–D9 (TZ via `.env`) |
 
 **S003 scope is locked.** All blocking items resolved. See Discussion doc for full Q&A record.
 

@@ -8,6 +8,8 @@ def parse_args() -> RunMode:
         description="Shift Schedule Notification Bot",
         formatter_class=argparse.RawTextHelpFormatter,
     )
+    parser.add_argument("--health", action="store_true",
+                        help="Run health check — config, DB, Telegram, XLSX (default when no flags given)")
     parser.add_argument("--production", action="store_true",
                         help="Send real notifications (required for any send)")
     parser.add_argument("--dry-run", action="store_true",
@@ -60,7 +62,7 @@ def parse_args() -> RunMode:
     elif args.production:
         mode = "production"
     else:
-        mode = "health"
+        mode = "health"  # default, also triggered by --health
 
     return RunMode(
         mode=mode,

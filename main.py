@@ -80,6 +80,9 @@ def run_health(config: dict) -> None:
     all_ok = True
 
     print("[CONFIG]   ✅ all variables loaded")
+    tz = os.environ.get("TZ", "(not set — using host timezone)")
+    local_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[TIMEZONE] {tz} — {local_now} local")
 
     # DB
     try:

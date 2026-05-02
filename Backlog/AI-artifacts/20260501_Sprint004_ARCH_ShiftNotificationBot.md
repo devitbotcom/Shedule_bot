@@ -17,14 +17,14 @@ The bot fires automatically on a schedule **locally via Docker**. IT runs `docke
 
 ## Scope Boundaries
 
-| In scope | Out of scope |
-|----------|--------------|
-| `cron` service in `docker-compose.yml` using `supercronic` | Namecheap cPanel deploy (S004b) |
-| `crontab` file — configurable schedule | venv setup on hosting |
-| Cron fires `python main.py --production` daily at 07:00 | Security hardening on server |
-| Log written per run as before | Log retention cron on server |
+| In scope | Out of scope                                |
+|----------|---------------------------------------------|
+| `cron` service in `docker-compose.yml` using `supercronic` | Namecheap cPanel deploy (S004b)             |
+| `crontab` file — configurable schedule | venv setup on hosting                       |
+| Cron fires `python main.py --production` daily at 07:00 | Security hardening on server                |
+| Log written per run as before | Log retention cron on server                |
 | README — Local automation section | README — Production Install section (S004b) |
-| Owner UAT: verify auto-fire locally | Viber adapter (S007) |
+| Owner UAT: verify auto-fire locally | Viber adapter (S007)                        |
 
 ---
 
@@ -152,9 +152,43 @@ No changes required in `run_production()` or `record_notification()` — they wi
 
 ---
 
-### AD-S004-009 — Cron service timezone (resolves OBS-002)
+### AD-S004-009 — Cron service timezone (resolves OBS-002, superseded by AD-S004-010)
 
 **Decision:** Add `TZ: UTC` to the `cron` service environment. Supercronic interprets cron schedule expressions using the container's local timezone. Making it explicit prevents any Docker host timezone from shifting schedule interpretation.
+
+**Superseded by AD-S004-010** — hardcoded UTC was found to be incorrect during UAT (Owner configures times in local timezone, not UTC).
+
+---
+
+### AD-S004-010 — Configurable timezone via `.env` (resolves NFR-S004-001)
+
+**Raised by:** Owner (UAT 2026-05-01) — sprint paused pending this fix.
+
+**Problem (NFR-S004-001 — Reliability: Timezone Alignment):**  
+`shift_hours` times are interpreted by `supercronic` in the container timezone. With `TZ=UTC` hardcoded, a Maintainer who sets `"labour": "17:00"` expecting 17:00 Kyiv time will get a notification at 17:00 UTC = 20:00 Kyiv — 3 hours late. No error, no warning — silent drift.
+
+**Quality characteristic:** Reliability → Correctness of scheduled behaviour under deployment assumptions.
+
+**Decision:**
+1. Remove hardcoded `TZ=UTC` from `docker-compose.yml` cron service
+2. Add `TZ=Europe/Kyiv` to `.env.example` with explanation — Maintainer sets this once at deploy
+3. `docker-compose.yml` passes `TZ` from env (no hardcoded value)
+4. Health check (`--health`) reports the active container timezone so Maintainer can verify alignment
+
+**Why no hardcoded default:** A silent wrong default (UTC) is worse than a missing one. If `TZ` is unset, `supercronic` uses the Docker host timezone — visible in health check output.
+
+**`.env.example` addition:**
+```
+# Timezone for cron schedule — must match the timezone where shift times are defined
+# Examples: Europe/Kyiv, UTC, Europe/Warsaw
+TZ=Europe/Kyiv
+```
+
+**`docker-compose.yml` cron service:**
+```yaml
+environment:
+  - TZ   # read from .env — set to your local timezone
+```
 
 ---
 
@@ -168,6 +202,10 @@ No changes required in `run_production()` or `record_notification()` — they wi
 | D4 | README — Local Automation section | `docker compose up -d cron`, how to watch logs, how to change schedule |
 | D5 | README — update message format example | Add department to "Зміна:" line per CR-003-2 |
 | D6 | Verify all env-provided paths work correctly in cron container context | No relative path fallbacks |
+| D7 | `docker-compose.yml` — remove hardcoded `TZ=UTC`; pass `TZ` from `.env` | AD-S004-010 |
+| D8 | `.env.example` — add `TZ=Europe/Kyiv` with explanation | AD-S004-010 |
+| D9 | Health check — report active container timezone + current local datetime | AD-S004-010 + 004-3 |
+| D10 | README — add cron verification step (compare `[TIMEZONE]` to wall clock) | 004-3 |
 
 ---
 
@@ -269,7 +307,7 @@ The bot filters to only send shifts matching the given `--shift-type` on that ru
 
 | Role      | Name | Date       | Status |
 |-----------|------|------------|--------|
-| Architect | AI   | 2026-05-01 | ✅ APPROVED |
-| Developer | AI   | 2026-05-01 | ✅ |
-| QA        | AI   | 2026-05-01 | ✅ PASS (pass 2) |
-| Owner     |      |            | ⏸ Ready for UAT |
+| Architect | AI   | 2026-05-01 | ✅ APPROVED (amended AD-S004-010 — 2026-05-01) |
+| Developer | AI   | 2026-05-01 | ⏸ D7–D9 pending |
+| QA        | AI   | 2026-05-01 | ⏸ Re-verification pending D7–D9 |
+| Owner     |      |            | ⏸ UAT paused — awaiting D7–D9 |

@@ -100,3 +100,17 @@ def test_date_invalid_format_exits(capsys):
     with pytest.raises(SystemExit) as exc:
         _parse(["--production", "--date", "28-04-2026"])
     assert exc.value.code == 2
+
+
+def test_shift_type():
+    # gen_crontab passes --shift-type so each cron entry sends only its day_type
+    mode = _parse(["--production", "--shift-type", "labour"])
+    assert mode.mode == "production"
+    assert mode.shift_type == "labour"
+
+
+def test_shift_type_without_production_exits(capsys):
+    # --shift-type without --production is rejected — filter only applies to real sends
+    with pytest.raises(SystemExit) as exc:
+        _parse(["--shift-type", "labour"])
+    assert exc.value.code == 2

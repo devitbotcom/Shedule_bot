@@ -2,7 +2,7 @@
 **Sprint:** 004  
 **Role:** Developer  
 **Date:** 2026-05-01  
-**Status:** ✅ DEV complete (incl. QA bug fixes) — awaiting QA re-verification + Owner UAT  
+**Status:** ✅ DEV complete (incl. QA bug fixes + UAT-004-3 fix) — awaiting Owner UAT re-verification  
 **Arch ref:** [`20260501_Sprint004_ARCH_ShiftNotificationBot.md`](20260501_Sprint004_ARCH_ShiftNotificationBot.md)
 
 ---
@@ -19,6 +19,11 @@ Add Docker cron service (`supercronic`) so the bot fires automatically at 07:00 
 |------|--------|--------|
 | `Dockerfile` | Install `supercronic` v0.2.29 binary via `curl` | ✅ |
 | `docker-compose.yml` | Add `cron` service; DNS fix (AD-S004-008); TZ=UTC (AD-S004-009) | ✅ |
+| `docker-compose.yml` | D7: remove hardcoded TZ; pass `TZ: ${TZ}` via compose interpolation; `/etc/localtime` mount (AD-S004-010 + UAT-004-3) | ✅ |
+| `.env.example` | D8: add `TZ=Europe/Kyiv` with explanation (AD-S004-010) | ✅ |
+| `main.py` | D9: health check already reports `[TIMEZONE]` name + local datetime (AD-S004-010) | ✅ |
+| `README.md` | D10: cron verification step added to section 10 (004-3) | ✅ |
+| `Dockerfile` | Add `tzdata` apt package — root-cause fix for UTC fallback (UAT-004-3) | ✅ |
 | `crontab` | New file at project root — default `0 7 * * *`; test instructions in comments | ✅ |
 | `README.md` | Add section 10 (Local Automation); fix message format example (add department per CR-003-2); update "Coming next" to S004b | ✅ |
 | `messenger/telegram_adapter.py` | Token sanitization in `send()` and `health_check()` — AD-S004-007 / BUG-S004-001 | ✅ |
@@ -68,6 +73,44 @@ Added `dns: [8.8.8.8, 8.8.4.4]` to both `bot` and `cron` services. Google public
 **Resolves:** OBS-002 (cron schedule timezone ambiguous)
 
 Added `TZ: UTC` to `cron` service environment. `supercronic` uses container local timezone to interpret the crontab schedule — making it explicit prevents host timezone from shifting the 07:00 fire time.
+
+---
+
+## Post-UAT Fixes (UAT pass → issues found 2026-05-02)
+
+### Fix 4 — UAT-004-3: Container clock 3 h behind host (`Dockerfile` + `docker-compose.yml`)
+
+**Resolves:** UAT item 004-3 — `[TIMEZONE] Europe/Kyiv — 04:38 local` while host clock showed `07:40`.
+
+**Root cause:** `python:3.11-slim` ships without `/usr/share/zoneinfo`. A named `TZ=` env var (e.g. `TZ=Europe/Kyiv`) requires the zoneinfo database to resolve — without it the runtime silently falls back to UTC. AD-S004-009 set `TZ: UTC` explicitly (correct for supercronic schedule stability) but left the host-facing display time broken.
+
+**Fix — `Dockerfile`:**
+```dockerfile
+RUN apt-get install -y --no-install-recommends curl ca-certificates tzdata \
+```
+Installing `tzdata` provides `/usr/share/zoneinfo` so named `TZ` values resolve correctly.
+
+**Fix — `docker-compose.yml` (both `bot` and `cron` services, per AD-S004-010):**
+```yaml
+volumes:
+  - /etc/localtime:/etc/localtime:ro
+environment:
+  TZ: ${TZ}  # read from .env via compose interpolation
+```
+`${TZ}` uses Docker Compose interpolation — Compose reads `.env` at parse time and substitutes the value before the container starts. No hardcoded value in compose — Maintainer sets `TZ=Europe/Kyiv` once in `.env`.
+
+**Why not `- TZ` (list form):** The list form reads from the host shell environment, not from `.env`. On a shell with no `TZ` set, it passes an empty value — overriding what `env_file` loaded and silently breaking timezone resolution.
+
+The `/etc/localtime` mount provides a fallback at the OS layer.
+
+**Verification:**
+```bash
+docker compose build
+docker compose run --rm bot python main.py
+# [TIMEZONE] Europe/Kyiv — 2026-05-02 07:xx local  ← must show Kyiv time (UTC+3)
+# Host server timezone does NOT need to be Europe/Kyiv.
+# TZ in .env is the single source of truth.
+```
 
 ### Tests added (`tests/test_telegram_adapter.py`)
 
