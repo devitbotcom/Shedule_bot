@@ -282,6 +282,19 @@ The bot filters to only send shifts matching the given `--shift-type` on that ru
 
 ---
 
+## NFR — NFR-S004-002: `--reload-schedule` scope too broad (raised UAT 2026-05-02)
+
+**Raised by:** Architect (UAT finding 004-05)  
+**Status:** ⏸ Deferred to S005
+
+**Problem:** `--reload-schedule` deletes dedup records for **all employees** on affected dates. If only one employee's day type was corrected in the XLSX, running `--reload-schedule` wipes the dedup for every other employee on those dates — cron or the next `--production` run resends notifications for all of them, not just the corrected one.
+
+**Workaround (current):** Use `--production --force --employee "Name"` to target only the corrected employee without touching others' dedup.
+
+**Proposed fix (S005):** Add `--reload-schedule --employee "Name"` scoped clear — deletes dedup only for the specified employee on dates found in the XLSX.
+
+---
+
 ## Deferred to S004b — Hosting Deploy
 
 | Item | Notes |

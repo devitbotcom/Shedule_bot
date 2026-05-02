@@ -96,14 +96,30 @@ docker compose logs -f cron
 
 **Change the schedule:**
 
-Open `data/schedule_mapping.json` and edit the `shift_hours` section:
+Open `data/schedule_mapping.json` and edit the `shift_hours` section, then reload the cron service:
+
+```bash
+docker compose restart cron
+```
 
 > The cron fires at these times, in the timezone set by `TZ` in your `.env` (e.g. `TZ=Europe/Kyiv`).
-Adding a new shift type or changing a time takes effect after a restarting the cron service — no code change needed.
 
-Apply the change:
+⚠️ **If the new fire time has already passed today**, the cron will not send until tomorrow.
+Run manually to send immediately:
 ```bash
-docker compose up -d cron
+docker compose run --rm bot python main.py --production
+```
+
+**Full workflow when correcting a shift that was already notified:**
+```bash
+# 1. Edit data/schedule_mapping.json (change shift_hours or day types)
+# 2. Edit data/schedule.xlsx if day type changed
+# 3. Clear dedup so the bot will resend
+docker compose run --rm bot python main.py --reload-schedule
+# 4. Reload cron with new schedule
+docker compose restart cron
+# 5. If new fire time already passed — send now
+docker compose run --rm bot python main.py --production
 ```
 
 **Verify container time before go-live:**

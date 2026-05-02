@@ -77,9 +77,71 @@ Fix applied to `docker-compose.yml`:
 
 Quality primitive was updated
 
-### 004-05 Trigger was found but skipped
-```log
-2026-05-02 08:44:11,882 [INFO] Starting shift_bot | mode=health
-2026-05-02 08:44:12,225 [INFO] Column 'Ургенція спеціалістів на дому' found but skipped (listed in skip_columns)
+### 004-05 Day-type correction after notification sent — ✅ ARCHITECT RULED (by design + gap noted)
+
+STR
+
+    1. We have a setting
+        ```JSON
+          "shift_hours": {
+            "labour":   "23:23",
+            "holiday": "16:30",
+            "other":   "08:51"
+          }
+        ```
+        and
+        ```XLSLX
+        Other	5/2/2026	лікар11 Aaaaaaaaaaaaaaaaa B.B.
+        ```
+        
+        System sent notification to messenger, as expected. 
+    
+    2. We changed type and run: docker compose run --rm bot python main.py --reload-schedule
+    
+        ```XLSLX
+        holiday	5/2/2026	лікар11 Aaaaaaaaaaaaaaaaa B.B.
+        ```
+        
+        System did not send a notification to messenger, as expected. 
+
+Expected: 
+Clarify this usecase, What is expected.
+
+Architect ruling (2026-05-02):
+Step 2 sent nothing because `python main.py` without `--production` runs in **health mode** — health mode never sends. This is correct behaviour.
+
+**Dedup key is `(employee_name, shift_date)` — day_type is not part of it.**  
+After `--reload-schedule` clears the dedup record, the system CAN resend with the corrected day type.
+
+**Correct workflows for day-type correction:**
+
+Full order when correcting a shift that was already sent:
+
+    1. Edit data/schedule_mapping.json
+    2. Clear dedup so bot will resend
+       docker compose run --rm bot python main.py --reload-schedule
+    3. Reload cron schedule
+       docker compose restart cron
+
+ACTUAL:
+No new message has been sent. 
+
+### 004-06 No notification after shift_hours change + restart cron past the fire time — ✅ ADDRESSED
+
+**Steps taken by Owner:**
+1. Changed `shift_hours.holiday` to `14:15`
+2. Ran `--reload-schedule` at 14:13
+3. Ran `docker compose restart cron` at ~14:17
+4. **Actual:** no message sent
+
+**Root cause:** Cron was restarted at 14:17 — after 14:15 had already passed. Supercronic loaded the new `15 14 * * *` entry but does not retroactively fire times that have passed today. Entry will fire tomorrow at 14:15.
+
+**This is expected cron behaviour — not a bug.** The workflow has a timing trap: if `docker compose restart cron` happens after the new fire time, the notification is missed for today.
+
+**Fix for today — run manually:**
+```bash
+docker compose run --rm bot python main.py --production
 ```
+
+**README updated** — section 10 now documents the full correction workflow including the ⚠️ warning that if the new fire time has already passed, `--production` must be run manually.
 
