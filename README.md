@@ -183,6 +183,169 @@ Ignores deduplication and resends all shifts. Use after uploading a corrected XL
 
 ---
 
+## For Production (cPanel — Namecheap)
+
+Docker is not available on shared hosting. The bot runs as a plain Python script under `venv`, triggered by cPanel cron jobs.
+
+### P0. Prerequisites (once)
+
+Configure SSH key access to your repository on the server via the cPanel terminal before running `git clone`. Without this, cloning a private repo will fail.
+
+### P1. Clone the repository
+
+```bash
+cd ~
+git clone <your-repo-url> shift_bot
+cd shift_bot
+```
+
+### P2. Create virtual environment
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### P3. Place data files
+
+Upload these files to `~/shift_bot/data/` via cPanel File Manager or `scp`:
+
+```
+~/shift_bot/data/
+├── schedule.xlsx
+├── schedule_mapping.json      ← copy from .example, edit once
+├── shift_bot.db               ← auto-created on first run
+└── logs/                      ← auto-created on first run
+```
+
+### P4. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` — use **absolute paths** and fill in your credentials:
+
+```
+XLSX_PATH=/home/<username>/shift_bot/data/schedule.xlsx
+DB_PATH=/home/<username>/shift_bot/data/shift_bot.db
+LOG_DIR=/home/<username>/shift_bot/data/logs
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token-here
+TELEGRAM_GROUP_CHAT_ID=-1001234567890
+TZ=Europe/Kyiv
+```
+
+### P5. Verify setup
+
+```bash
+source venv/bin/activate
+python main.py
+```
+
+All lines should show ✅. Check that `[TIMEZONE]` shows `Europe/Kyiv` and matches your wall clock.
+
+### P6. Preview before sending
+
+```bash
+python main.py --dry-run
+```
+
+### P7. Security hardening
+
+Run once after deploy:
+
+```bash
+chmod 600 .env
+chmod 700 data
+chmod 700 data/logs
+```
+
+After the first `--production` run (which creates `shift_bot.db`):
+
+```bash
+chmod 600 data/shift_bot.db
+```
+
+### P8. Configure cPanel cron jobs
+
+In **cPanel → Cron Jobs**, add four entries.
+
+**Shift notifications — 3 entries (one per shift type):**
+
+Cron times are your `shift_hours` values converted to UTC. In summer (EEST, UTC+3) subtract 3 h; in winter (EET, UTC+2) subtract 2 h.
+
+| Shift type | `shift_hours` (Kyiv) | cPanel time (UTC, summer EEST) | Same day? |
+|---|---|---|---|
+| labor | 17:00 | 14:00 | ✅ |
+| holiday | 17:34 | 14:34 | ✅ |
+| other | 01:25 | 22:25 | ⚠️ previous calendar day |
+
+> ⚠️ **DST reminder:** Update all 3 cron times when clocks change (last Sunday of March and October).
+>
+> ⚠️ **Whenever you change `shift_hours`:** recalculate the UTC times and update all 3 cPanel cron entries.
+
+Each entry uses the `TZ=Europe/Kyiv` prefix so the bot sees Kyiv date, not server UTC date:
+
+```
+0  14 * * *  TZ=Europe/Kyiv /home/<username>/shift_bot/venv/bin/python /home/<username>/shift_bot/main.py --production --shift-type labor
+34 14 * * *  TZ=Europe/Kyiv /home/<username>/shift_bot/venv/bin/python /home/<username>/shift_bot/main.py --production --shift-type holiday
+25 22 * * *  TZ=Europe/Kyiv /home/<username>/shift_bot/venv/bin/python /home/<username>/shift_bot/main.py --production --shift-type other
+```
+
+**Log retention — 1 entry (weekly, Sunday 03:00 UTC):**
+
+```
+0 3 * * 0  find /home/<username>/shift_bot/data/logs -name "*.log" -mtime +30 -delete
+```
+
+### P9. Production maintenance commands
+
+Replace `docker compose run --rm bot` with the venv prefix `cd ~/shift_bot && source venv/bin/activate &&`:
+
+| Task | Command |
+|---|---|
+| Health check | `python main.py` |
+| Preview shifts | `python main.py --dry-run` |
+| Send notifications | `python main.py --production` |
+| Resend one person | `python main.py --production --employee "Name"` |
+| Force resend all | `python main.py --production --force` |
+| Clear dedup records | `python main.py --reload-schedule` |
+
+### P10. Update schedule monthly
+
+```bash
+cd ~/shift_bot && source venv/bin/activate
+python main.py --reload-schedule
+python main.py --dry-run
+python main.py --production
+```
+
+### P11. Update the bot
+
+```bash
+cd ~/shift_bot
+git pull
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+No restart needed — cPanel cron picks up changes on the next fire.
+
+### P12. Clock drift monitor
+
+Every `--production` run logs one of:
+
+```
+Clock drift OK: 2s
+Clock drift: server deviates from world time by 3720s — check server NTP or DST offset
+Clock drift check skipped — time API unreachable
+```
+
+A `WARNING: Clock drift check skipped` line means the public time API (`worldtimeapi.org`) was temporarily unreachable — **this is not a clock drift event**. If it appears repeatedly over several days, check the API status. A `WARNING: Clock drift: server deviates...` line means the server clock itself is wrong — contact hosting support or recalculate cron UTC times for DST.
+
+---
+
 ## For Developer
 
 ### Required XLSX column names
@@ -241,8 +404,3 @@ Shedule_bot/
 └── .env.example
 ```
 
----
-
-## Coming next — S004b
-
-Production deploy: Namecheap cPanel setup, venv, cron job configuration, hardening.

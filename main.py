@@ -4,6 +4,8 @@ import sys
 import time
 from datetime import datetime, timezone
 
+import requests
+
 from cli import parse_args
 from config import load_config
 from db import (
@@ -172,7 +174,25 @@ def run_reload_schedule(config: dict, dry_run: bool) -> None:
     sys.exit(0)
 
 
+def _check_clock_drift() -> None:
+    try:
+        resp = requests.get("https://worldtimeapi.org/api/timezone/UTC", timeout=5)
+        world_utc = datetime.fromisoformat(resp.json()["utc_datetime"])
+        delta = abs((datetime.now(timezone.utc) - world_utc).total_seconds())
+        if delta > 300:
+            logging.warning(
+                "Clock drift: server deviates from world time by %.0fs — check server NTP or DST offset",
+                delta,
+            )
+        else:
+            logging.info("Clock drift OK: %.0fs", delta)
+    except Exception:
+        logging.warning("Clock drift check skipped — time API unreachable")
+
+
 def run_production(config: dict, run_mode: RunMode) -> None:
+    _check_clock_drift()
+
     from datetime import date as _date
     target_date = run_mode.date or _date.today().strftime("%Y-%m-%d")
 
