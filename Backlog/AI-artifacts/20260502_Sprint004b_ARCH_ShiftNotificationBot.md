@@ -69,6 +69,8 @@ TZ=Europe/Kyiv /home/<username>/shift_bot/venv/bin/python /home/<username>/shift
 
 No build step. No Docker. After each pull, `pip install -r requirements.txt` inside the activated venv ensures dependencies are up to date.
 
+**Git authentication:** IT configures SSH key access to the repository on the server manually before running `git clone`. README must include this as a prerequisite step.
+
 ---
 
 ### AD-S004b-003 — `venv` replaces container image
@@ -122,12 +124,18 @@ The code already uses `os.path.abspath` — these `.env` values provide the root
 After deploy, IT runs once:
 ```bash
 chmod 600 .env
-chmod 600 data/shift_bot.db   # if already created
 chmod 700 data/logs
 chmod 700 data
 ```
 
+Then after the first `--production` run (which creates `shift_bot.db`):
+```bash
+chmod 600 data/shift_bot.db
+```
+
 Rationale: shared hosting means other processes on the same server may be able to read world-readable files. Tokens and DB must not be world-readable.
+
+> **Architect note:** `shift_bot.db` does not exist at deploy time — it is created on first run. README must explicitly remind IT to apply `chmod 600` to the DB file after the first successful `--production` run.
 
 ---
 
@@ -183,6 +191,7 @@ def _check_clock_drift() -> None:
 | D5 | README — Log retention cron entry               | Weekly find/delete command                                                                 |
 | D6 | `.env.example` — add absolute path placeholders | `DB_PATH`, `LOG_DIR`, `DATA_DIR` with `<username>` placeholder and note                    |
 | D7 | `main.py` — `_check_clock_drift()` function     | Called at start of `run_production()`; non-blocking; logs WARNING if delta > 5 min (AD-S004b-008) |
+| D8 | Unit tests for `_check_clock_drift()`           | Positive: delta < 300s → INFO logged. Negative: delta > 300s → WARNING logged. Negative: API unreachable → WARNING logged, no exception raised |
 
 ---
 
@@ -194,9 +203,12 @@ def _check_clock_drift() -> None:
 | U02 | `python main.py` (health check)     | All lines ✅ including `[TIMEZONE]` showing Europe/Kyiv time           |
 | U03 | `python main.py --dry-run`          | Correct shifts listed for today                                       |
 | U04 | `python main.py --production`       | Notification arrives in Telegram group                                |
-| U05 | cPanel cron fires at scheduled time | Notification arrives automatically, log written                       |
+| U05 | cPanel cron fires at scheduled time | Notification arrives automatically, log written. **Test shortcut:** temporarily set the cron entry to `* * * * *`, wait one minute, verify notification and log, then restore the correct time. |
 | U06 | Local Docker workflow               | Still works unchanged — production deploy does not affect local setup |
 | U07 | `python main.py --production` log   | `Clock drift OK` line present; no WARNING in normal conditions        |
+| U08 | cPanel cron log shows correct timezone | Check log file written by the cron-fired run — `[TIMEZONE]` line must show `Europe/Kyiv`, not `UTC`. Confirms `TZ=` prefix is honoured by cPanel cron. |
+
+> **Note — log retention (AD-S004b-007):** Verify the weekly cleanup cron entry exists in cPanel UI after setup. Full functional verification requires waiting for the Sunday 03:00 UTC fire — confirm by checking that log files older than 30 days are absent after that date.
 
 ---
 
