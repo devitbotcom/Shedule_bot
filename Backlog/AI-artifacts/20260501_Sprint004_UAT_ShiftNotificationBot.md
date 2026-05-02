@@ -44,7 +44,7 @@ The static `crontab` file seen previously is no longer used — the cron service
 
 '''
 
-=== 004-3 Missing startup time quality check of time [HIGH] — ⏸ PENDING RE-TEST
+### 004-3 Missing startup time quality check of time [HIGH] — DONE
 
 Actual: IT does not have instruction in readme.md on how to make sure how the local docker time is set. 
 
