@@ -230,5 +230,5 @@ None. All OQs resolved:
 |-----------|------|------------|---------------|
 | Architect | AI   | 2026-05-02 | ✅ APPROVED    |
 | Developer | AI   | 2026-05-02 | ✅ COMPLETE    |
-| QA        | AI   |            | ⏸ Pending     |
+| QA        | AI   | 2026-05-02 | ✅ SIGNED OFF — QA-001/002/003 deferred to UAT |
 | Owner     |      |            | ⏸ Pending UAT |

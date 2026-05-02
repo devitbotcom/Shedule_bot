@@ -19,3 +19,25 @@ The clock drift monitor queries `worldtimeapi.org` — a free public API with no
 
 **Proposed future mitigation (not in scope S004b):**  
 Add a secondary fallback time API (e.g., `timeapi.io`) tried when `worldtimeapi.org` is unreachable.
+
+---
+
+## RISK-002 — `other` shift midnight-crossing not explained to IT
+
+**Raised:** 2026-05-02  
+**Sprint:** S004b  
+**Component:** README P8 / cPanel cron entry for `--shift-type other`  
+**ISO 25010:** Operability
+
+**Description:**  
+The `other` shift fires at 01:25 Kyiv time = 22:25 UTC the previous calendar day. The cPanel cron entry fires at `25 22 * * *` — a day before the shift date in UTC terms. The `TZ=Europe/Kyiv` prefix ensures the bot correctly identifies the next-day Kyiv date, but this is not explained in the README. IT seeing a cron fire at 22:25 for a shift dated the following day may suspect a misconfiguration and "fix" the cron entry, breaking the behaviour.
+
+**Likelihood:** Medium (Owner already encountered confusion about this during S004 testing)  
+**Impact:** Medium (IT changes cron time, `other` shifts stop firing on correct date)
+
+**Current mitigation:**  
+- `TZ=Europe/Kyiv` prefix is present in the documented cron entry — behaviour is correct
+- ARCH AD-S004b-001 documents the midnight-crossing logic
+
+**Proposed future mitigation:**  
+Add one explanatory sentence to README P8 next to the `other` cron entry clarifying that 22:25 UTC = 01:25 Kyiv next day, and that `TZ=` prefix handles the date correctly.
