@@ -3,7 +3,7 @@
 **Sprint:** 004b  
 **Role:** Architect  
 **Date:** 2026-05-02  
-**Status:** ✅ APPROVED  
+**Status:** ⚠️ REVISED — post-UAT corrections applied 2026-05-03 (OQ-3 wrong, AD-S004b-001 table corrected)  
 **Scope:** Production deploy to Namecheap cPanel shared hosting. Minimal code change: one new check in `main.py` (clock drift monitor).  
 **Depends on:** S004 ✅ DONE  
 **Blocks:** S005 (dedup key + --shift-type scoping)
@@ -38,9 +38,11 @@ The bot runs automatically in production on Namecheap cPanel shared hosting. IT 
 
 ## Key Architectural Decisions
 
-### AD-S004b-001 — TZ prefix in every cPanel cron entry (resolves UTC/Kyiv date mismatch)
+### AD-S004b-001 — TZ prefix in every cPanel cron entry (resolves server-local/Kyiv date mismatch)
 
-**Problem:** The Namecheap server runs UTC. The bot uses `datetime.now()` to determine "today" when looking up shifts in the XLSX. On a UTC server, for shift types whose local notification time crosses midnight (e.g., `other` at 01:25 Kyiv = 22:25 UTC), the cron fires on calendar day D while the shift belongs to day D+1 in Kyiv time — causing the bot to find no shifts for that run.
+> ⚠️ **Post-UAT correction (2026-05-03):** OQ-3 was originally answered as UTC after a `export TZ='UTC'` shell override masked the real server timezone. The server is EDT (UTC-4). The cron table below has been corrected. The `TZ=Europe/Kyiv` decision is unchanged — it solves the same problem regardless of the server's base timezone.
+
+**Problem:** The Namecheap server runs EDT (UTC-4). The bot uses `datetime.now()` to determine "today" when looking up shifts in the XLSX. Without a timezone override, `datetime.now()` returns the server's local date — which for shift types whose Kyiv notification time crosses midnight in server-local time (e.g., `other` at 01:25 Kyiv = 18:25 EDT the previous day), means the cron fires on calendar day D while the shift belongs to day D+1 in Kyiv time — causing the bot to find no shifts for that run.
 
 **Decision:** Prefix every cPanel cron entry with `TZ=Europe/Kyiv`. This sets the timezone for the Python process before it starts, so `datetime.now()` returns Kyiv local time and date on all three cron entries.
 
@@ -51,15 +53,17 @@ Applied to all three entries for consistency — not only the midnight-crossing 
 TZ=Europe/Kyiv /home/<username>/shift_bot/venv/bin/python /home/<username>/shift_bot/main.py --production --shift-type <type>
 ```
 
-**UTC time conversion (UTC+3 / EEST — verify each summer/winter):**
+**Server-local time conversion (server = EDT UTC-4, Kyiv = EEST UTC+3, offset = 7h):**
 
-| Shift type | `shift_hours` (Kyiv) | cPanel cron time (UTC) | Same calendar day?                             |
-|------------|----------------------|------------------------|------------------------------------------------|
-| labor      | 17:00                | 14:00                  | ✅ Yes                                          |
-| holiday    | 17:34                | 14:34                  | ✅ Yes                                          |
-| other      | 01:25                | 22:25 (previous day)   | ⚠️ Crosses midnight — `TZ=` prefix is critical |
+| Shift type | `shift_hours` (Kyiv EEST) | cPanel cron time (EDT) | Same calendar day?                                  |
+|------------|--------------------------|------------------------|-----------------------------------------------------|
+| labor      | 17:00                    | 10:00                  | ✅ Yes                                               |
+| holiday    | 17:34                    | 10:34                  | ✅ Yes                                               |
+| other      | 01:25                    | 18:25 (previous day)   | ⚠️ Crosses midnight — `TZ=` prefix is critical      |
 
-⚠️ **DST note:** UTC offset changes twice a year (EEST UTC+3 in summer, EET UTC+2 in winter). IT must update cPanel cron times when clocks change.
+**Formula:** cPanel cron time (EDT) = Kyiv time − 7h. If result is negative, subtract one calendar day.
+
+⚠️ **DST note:** Both Kyiv and the server observe DST, but on different schedules. Current offset is 7h (EEST UTC+3 − EDT UTC-4). In winter: Kyiv → EET (UTC+2), server → EST (UTC-5), offset remains 7h. However, the transitions happen on different dates — verify the offset whenever either timezone changes clocks. IT must update all 3 cPanel cron entries when the offset changes.
 
 ---
 
@@ -97,10 +101,10 @@ This replaces every `docker compose run --rm bot python main.py <flags>` from th
 
 **Decision:** IT configures 3 cron entries manually in the cPanel cron UI.
 
-**Single source of truth gap:** When `shift_hours` in `schedule_mapping.json` is updated, IT must also update the 3 cPanel cron times manually (applying the UTC offset). This is a documented two-step — not a bug.
+**Single source of truth gap:** When `shift_hours` in `schedule_mapping.json` is updated, IT must also update the 3 cPanel cron times manually (applying the server-local time offset — see AD-S004b-001 formula). This is a documented two-step — not a bug.
 
 **README must make this explicit:**
-> Whenever you change `shift_hours`, recalculate the UTC times and update all 3 cPanel cron entries.
+> Whenever you change `shift_hours`, recalculate the server-local cron times using the offset formula in the cron table, and update all 3 cPanel cron entries.
 
 ---
 
@@ -141,7 +145,7 @@ Rationale: shared hosting means other processes on the same server may be able t
 
 ### AD-S004b-007 — Log retention via cPanel cron
 
-One additional cPanel cron entry (weekly, Sunday 03:00 UTC):
+One additional cPanel cron entry (weekly, Sunday 03:00 EDT — server local time):
 ```
 0 3 * * 0  find /home/<username>/shift_bot/data/logs -name "*.log" -mtime +30 -delete
 ```
@@ -152,7 +156,7 @@ Keeps logs for 30 days. Prevents unbounded disk growth on shared hosting.
 
 ### AD-S004b-008 — Clock drift monitor on every `--production` run
 
-**Problem:** On a UTC server with a manually maintained cron schedule, two silent failure modes exist: server clock drift (NTP issue) and DST misconfiguration (IT forgot to update cPanel cron times after clocks changed). Both cause notifications to fire at the wrong real-world time with no error.
+**Problem:** On a server with a manually maintained cron schedule, two silent failure modes exist: server clock drift (NTP issue) and DST misconfiguration (IT forgot to update cPanel cron entries after either Kyiv or server clocks changed). Both cause notifications to fire at the wrong real-world time with no error.
 
 **Decision:** At the start of every `--production` run, query a public HTTP time API, compare the returned UTC time to `datetime.utcnow()`, and log the delta.
 
@@ -182,33 +186,45 @@ def _check_clock_drift() -> None:
 
 ## Developer Deliverables
 
-| #  | Deliverable                                     | Notes                                                                                      |
-|----|-------------------------------------------------|--------------------------------------------------------------------------------------------|
-| D1 | README — Production Install section             | Full step-by-step: git clone, venv, .env, cPanel cron setup, verify                        |
-| D2 | README — UTC conversion table                   | Shows how to convert `shift_hours` to UTC cron times; DST warning                          |
-| D3 | README — Production maintenance commands        | Replaces `docker compose run --rm bot` equivalents                                         |
-| D4 | README — Security hardening step                | chmod instructions, one-time after deploy                                                  |
-| D5 | README — Log retention cron entry               | Weekly find/delete command                                                                 |
-| D6 | `.env.example` — add absolute path placeholders | `DB_PATH`, `LOG_DIR`, `DATA_DIR` with `<username>` placeholder and note                    |
-| D7 | `main.py` — `_check_clock_drift()` function     | Called at start of `run_production()`; non-blocking; logs WARNING if delta > 5 min (AD-S004b-008) |
+| #  | Deliverable                                     | Notes                                                                                                                                          |
+|----|-------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| D1 | README — Production Install section             | Full step-by-step: git clone, venv, .env, cPanel cron setup, verify                                                                            |
+| D2 | README — server-local cron conversion table     | Shows how to convert `shift_hours` to EDT cron times using offset formula; DST warning (corrected from UTC — UAT finding 004b-4)               |
+| D3 | README — Production maintenance commands        | Replaces `docker compose run --rm bot` equivalents                                                                                             |
+| D4 | README — Security hardening step                | chmod instructions, one-time after deploy                                                                                                      |
+| D5 | README — Log retention cron entry               | Weekly find/delete command                                                                                                                     |
+| D6 | `.env.example` — add absolute path placeholders | `DB_PATH`, `LOG_DIR`, `DATA_DIR` with `<username>` placeholder and note                                                                        |
+| D7 | `main.py` — `_check_clock_drift()` function     | Called at start of `run_production()`; non-blocking; logs WARNING if delta > 5 min (AD-S004b-008)                                              |
 | D8 | Unit tests for `_check_clock_drift()`           | Positive: delta < 300s → INFO logged. Negative: delta > 300s → WARNING logged. Negative: API unreachable → WARNING logged, no exception raised |
+| D9 | README — Production cron management subsection  | How to update cPanel cron when `shift_hours` changes; how to run manually if missed; DST reminder — UAT finding 004b-3                         |
 
 ---
 
 ## UAT Checklist — Owner Executes on Server
 
-| #   | Action                              | Expected result                                                       |
-|-----|-------------------------------------|-----------------------------------------------------------------------|
-| U01 | `git clone` + `pip install`         | No errors                                                             |
-| U02 | `python main.py` (health check)     | All lines ✅ including `[TIMEZONE]` showing Europe/Kyiv time           |
-| U03 | `python main.py --dry-run`          | Correct shifts listed for today                                       |
-| U04 | `python main.py --production`       | Notification arrives in Telegram group                                |
-| U05 | cPanel cron fires at scheduled time | Notification arrives automatically, log written. **Test shortcut:** temporarily set the cron entry to `* * * * *`, wait one minute, verify notification and log, then restore the correct time. |
-| U06 | Local Docker workflow               | Still works unchanged — production deploy does not affect local setup |
-| U07 | `python main.py --production` log   | `Clock drift OK` line present; no WARNING in normal conditions        |
-| U08 | cPanel cron log shows correct timezone | Check log file written by the cron-fired run — `[TIMEZONE]` line must show `Europe/Kyiv`, not `UTC`. Confirms `TZ=` prefix is honoured by cPanel cron. |
+| #   | Action                                 | Expected result                                                                                                                                                                                 |
+|-----|----------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| U01 | `git clone` + `pip install`            | No errors                                                                                                                                                                                       |
+| U02 | `python main.py` (health check)        | All lines ✅ including `[TIMEZONE]` showing Europe/Kyiv time                                                                                                                                     |
+| U03 | `python main.py --dry-run`             | Correct shifts listed for today                                                                                                                                                                 |
+| U04 | `python main.py --production`          | Notification arrives in Telegram group                                                                                                                                                          |
+| U05 | cPanel cron fires at scheduled time    | Notification arrives automatically, log written. **Test shortcut:** temporarily set the cron entry to `* * * * *`, wait one minute, verify notification and log, then restore the correct time. |
+| U06 | Local Docker workflow                  | Still works unchanged — production deploy does not affect local setup                                                                                                                           |
+| U07 | `python main.py --production` log      | `Clock drift OK` line present; no WARNING in normal conditions                                                                                                                                  |
+| U08 | cPanel cron log shows correct timezone | Check log file written by the cron-fired run — `[TIMEZONE]` line must show `Europe/Kyiv`, not `UTC`. Confirms `TZ=` prefix is honoured by cPanel cron.                                          |
 
-> **Note — log retention (AD-S004b-007):** Verify the weekly cleanup cron entry exists in cPanel UI after setup. Full functional verification requires waiting for the Sunday 03:00 UTC fire — confirm by checking that log files older than 30 days are absent after that date.
+> **Note — log retention (AD-S004b-007):** Verify the weekly cleanup cron entry exists in cPanel UI after setup. Full functional verification requires waiting for the Sunday 03:00 EDT fire — confirm by checking that log files older than 30 days are absent after that date.
+
+---
+
+## UAT Findings Triage (2026-05-03)
+
+| Finding | Title | Decision | Rationale |
+|---------|-------|----------|-----------|
+| 004b-1 | Extend health with shift schedule | ⏩ Deferred to S005 | New feature; not in S004b scope |
+| 004b-2 | Extend health with env time and offset | ⏩ Deferred to S005 | New feature; not in S004b scope |
+| 004b-3 | README missing production cron management | 🔧 Fix in S004b — D9 | Gap in D1 deliverable; IT cannot operate production without this |
+| 004b-4 | README cron table uses wrong server timezone | 🔧 Fix in S004b — D2 | Bug in D2 deliverable; cron entries calculated from wrong timezone will fire at wrong times |
 
 ---
 
@@ -220,15 +236,15 @@ None. All OQs resolved:
 |------|-----------------|-------------------------------------------------------------------------------|
 | OQ-1 | cPanel username | Not needed — `.env` uses `<username>` placeholder; IT fills in at deploy time |
 | OQ-2 | git available?  | ✅ Yes (`git --version` confirmed)                                             |
-| OQ-3 | Server timezone | UTC — cron times must subtract 3h (EEST); DST adjustment required twice/year  |
+| OQ-3 | Server timezone | ~~UTC~~ **CORRECTED (2026-05-03):** Server runs EDT (UTC-4). Original answer was taken under `export TZ='UTC'` shell override which masked the real timezone. Cron times must subtract 7h from Kyiv EEST (UTC+3). DST adjustment required when either timezone changes clocks — verify offset at each transition. |
 
 ---
 
 ## Sprint Sign-off
 
-| Role      | Name | Date       | Status        |
-|-----------|------|------------|---------------|
-| Architect | AI   | 2026-05-02 | ✅ APPROVED    |
-| Developer | AI   | 2026-05-02 | ✅ COMPLETE    |
-| QA        | AI   | 2026-05-02 | ✅ SIGNED OFF — QA-001/002/003 deferred to UAT |
-| Owner     |      |            | ⏸ Pending UAT |
+| Role      | Name | Date       | Status                                                                |
+|-----------|------|------------|-----------------------------------------------------------------------|
+| Architect | AI   | 2026-05-03 | ✅ REVISED — OQ-3 corrected, AD-S004b-001 table corrected, D9 added; ready for Developer (D2+D9) |
+| Developer | AI   | 2026-05-02 | ✅ D1–D8 COMPLETE — D2 correction + D9 pending                         |
+| QA        | AI   | 2026-05-02 | ✅ SIGNED OFF — QA-001/002/003 deferred to UAT                         |
+| Owner     |      | 2026-05-03 | ⏸ IN PROGRESS — see `20260503_Sprint004b_UAT_ShiftNotificationBot.md` |

@@ -133,7 +133,7 @@ Check the `[TIMEZONE]` line — the timezone and local time shown must match you
 docker compose stop cron
 ```
 
-### 9. Update schedule monthly
+### 9. Update schedule monthly (manually)
 
 When a new monthly XLSX is ready:
 
@@ -146,7 +146,7 @@ docker compose run --rm bot python main.py --reload-schedule
 3. Run `--dry-run` to verify the new schedule looks correct
 4. Run `--production` to send
 
-### 6. Send notifications manually
+### 6. Send notifications (manually)
 
 ```bash
 docker compose run --rm bot python main.py --production
@@ -164,7 +164,7 @@ Sends one Telegram message per shift to the group. Each message follows this for
 
 The bot skips shifts already sent (deduplication) — safe to re-run if cron fires twice.
 
-### 7. Resend manually for one person
+### 7. Resend for one person (manually)
 
 ```bash
 docker compose run --rm bot python main.py --production --employee "Іваненко О.В."
@@ -172,7 +172,7 @@ docker compose run --rm bot python main.py --production --employee "Іванен
 
 Sends only that person's shift notification. Useful if a message was missed or failed.
 
-### 8. Force resend all manually
+### 8. Force resend all (manually)
 
 ```bash
 docker compose run --rm bot python main.py --production --force
@@ -190,6 +190,12 @@ Docker is not available on shared hosting. The bot runs as a plain Python script
 ### P0. Prerequisites (once)
 
 Configure SSH key access to your repository on the server via the cPanel terminal before running `git clone`. Without this, cloning a private repo will fail.
+
+How to set it up in cPanel:
+
+   ???
+
+
 
 ### P1. Clone the repository
 
@@ -275,11 +281,11 @@ In **cPanel → Cron Jobs**, add four entries.
 
 Cron times are your `shift_hours` values converted to UTC. In summer (EEST, UTC+3) subtract 3 h; in winter (EET, UTC+2) subtract 2 h.
 
-| Shift type | `shift_hours` (Kyiv) | cPanel time (UTC, summer EEST) | Same day? |
-|---|---|---|---|
-| labor | 17:00 | 14:00 | ✅ |
-| holiday | 17:34 | 14:34 | ✅ |
-| other | 01:25 | 22:25 | ⚠️ previous calendar day |
+| Shift type | `shift_hours` (Kyiv) | cPanel time (UTC, summer EEST) | Same day?                |
+|------------|----------------------|--------------------------------|--------------------------|
+| labor      | 17:00                | 14:00                          | ✅                        |
+| holiday    | 17:34                | 14:34                          | ✅                        |
+| other      | 01:25                | 22:25                          | ⚠️ previous calendar day |
 
 > ⚠️ **DST reminder:** Update all 3 cron times when clocks change (last Sunday of March and October).
 >
@@ -303,14 +309,14 @@ Each entry uses the `TZ=Europe/Kyiv` prefix so the bot sees Kyiv date, not serve
 
 Replace `docker compose run --rm bot` with the venv prefix `cd ~/shift_bot && source venv/bin/activate &&`:
 
-| Task | Command |
-|---|---|
-| Health check | `python main.py` |
-| Preview shifts | `python main.py --dry-run` |
-| Send notifications | `python main.py --production` |
-| Resend one person | `python main.py --production --employee "Name"` |
-| Force resend all | `python main.py --production --force` |
-| Clear dedup records | `python main.py --reload-schedule` |
+| Task                | Command                                         |
+|---------------------|-------------------------------------------------|
+| Health check        | `python main.py`                                |
+| Preview shifts      | `python main.py --dry-run`                      |
+| Send notifications  | `python main.py --production`                   |
+| Resend one person   | `python main.py --production --employee "Name"` |
+| Force resend all    | `python main.py --production --force`           |
+| Clear dedup records | `python main.py --reload-schedule`              |
 
 ### P10. Update schedule monthly
 
@@ -367,16 +373,16 @@ It collects and runs every file matching tests/test_*.py, prints results, then t
 
 ### CLI reference
 
-| Command                                      | Effect                               |
-|----------------------------------------------|--------------------------------------|
+| Command                                      | Effect                                    |
+|----------------------------------------------|-------------------------------------------|
 | `python main.py --health`                    | Health check — config, DB, XLSX, timezone |
-| `python main.py`                             | Same as `--health` (default)         |
-| `python main.py --dry-run`                   | Preview shift data, no sends         |
-| `python main.py --production`                | Send notifications to group          |
-| `python main.py --production --employee "X"` | Send for one employee only           |
-| `python main.py --production --force`        | Resend all, ignore deduplication     |
-| `python main.py --reload-schedule`           | Clear dedup records so cron re-sends |
-| `python main.py --reload-schedule --dry-run` | Preview what would be cleared        |
+| `python main.py`                             | Same as `--health` (default)              |
+| `python main.py --dry-run`                   | Preview shift data, no sends              |
+| `python main.py --production`                | Send notifications to group               |
+| `python main.py --production --employee "X"` | Send for one employee only                |
+| `python main.py --production --force`        | Resend all, ignore deduplication          |
+| `python main.py --reload-schedule`           | Clear dedup records so cron re-sends      |
+| `python main.py --reload-schedule --dry-run` | Preview what would be cleared             |
 
 ### Project structure
 
