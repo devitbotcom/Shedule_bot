@@ -128,7 +128,7 @@ Fix: `venv/` added to `.gitignore` (2026-05-03).
 Quality primitive was updated? — Yes: rule added to `AI-assistance/ext/backend-python.md` — `.gitignore` must cover all local runtime artifacts; QA must run `git status` on a clean checkout before release.
 
 
-### 004b-6 Wrong info about offset. [high]
+### 004b-6 Wrong info about offset. [high] - UAT in progress
 
 Actual:
 ```console 
@@ -151,7 +151,7 @@ meaningful info for maintainers to show
 
 ---
 
-### 004b-7 `--gen-crontab` does not install cron entries — IT still required to add manually [CRITICAL]
+### 004b-7 `--gen-crontab` does not install cron entries — IT still required to add manually [CRITICAL] - UAT in progress
 
 Actual:
 ```console
