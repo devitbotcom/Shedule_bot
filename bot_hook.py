@@ -9,6 +9,11 @@ import os
 import sys
 
 _ROOT = os.path.dirname(os.path.realpath(__file__))
+_VENV = os.path.join(_ROOT, "venv", "lib",
+                     f"python{sys.version_info.major}.{sys.version_info.minor}",
+                     "site-packages")
+if os.path.isdir(_VENV):
+    sys.path.insert(0, _VENV)
 sys.path.insert(0, _ROOT)
 
 import requests

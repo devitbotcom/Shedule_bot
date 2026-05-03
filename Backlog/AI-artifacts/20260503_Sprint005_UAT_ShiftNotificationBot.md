@@ -18,9 +18,10 @@ POC1 notification pipeline is untouched.
 
 The following must already be done on the server (see `readme_WEBHOOK.md` for full steps):
 
-- [ ] `bot_hook.py` symlinked from `public_html/` and `chmod 755`
+- [ ] Latest code pulled: `cd ~/Shedule_bot && git pull`
+- [ ] `bot_hook.py` symlinked from `public_html/` and `chmod 755`; verify: `curl -s https://yourdomain.com/bot_hook.py` returns `{}`
 - [ ] `.env` has `WEBHOOK_URL`, `WEBHOOK_SECRET_TOKEN`, `TELEGRAM_BOT_TOKEN`, `DB_PATH`
-- [ ] Webhook registered: `python3.11 main.py --register-webhook` → `[WEBHOOK] ✅ Registered: …`
+- [ ] Webhook registered: `cd ~/Shedule_bot && source venv/bin/activate && TZ=Europe/Kyiv python main.py --register-webhook` → `[WEBHOOK] ✅ Registered: …`
 
 If prerequisites are not yet done, complete them first — UAT cannot proceed without a live webhook.
 
@@ -79,7 +80,7 @@ ID: <number>
 1. Note your Telegram ID from U005-1
 2. Run:
    ```bash
-   /opt/alt/python311/bin/python3.11 ~/Shedule_bot/main.py --bootstrap-it <your_telegram_id>
+   cd ~/Shedule_bot && source venv/bin/activate && TZ=Europe/Kyiv python main.py --bootstrap-it <your_telegram_id>
    ```
 
 **Expected output:**
@@ -151,7 +152,7 @@ Note that user's Telegram ID from the bot's reply to their `/start`.
 **Steps:**
 1. Run the existing notification pipeline as normal (or dry-run):
    ```bash
-   /opt/alt/python311/bin/python3.11 ~/Shedule_bot/main.py --dry-run
+   cd ~/Shedule_bot && source venv/bin/activate && TZ=Europe/Kyiv python main.py --dry-run
    ```
 
 **Pass criteria:** output identical to pre-S005 behaviour; no errors referencing webhook or user tables.

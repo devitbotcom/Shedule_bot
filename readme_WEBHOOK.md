@@ -8,14 +8,28 @@ On cPanel shared hosting this runs as a CGI script — no persistent process req
 
 ---
 
-## Step 1 — Symlink the CGI handler
+## Step 0 — Pull latest code
 
 In **cPanel → Advanced → Terminal**:
+
+```bash
+cd ~/Shedule_bot && git pull
+```
+
+---
+
+## Step 1 — Symlink the CGI handler
 
 ```bash
 ln -s ~/Shedule_bot/bot_hook.py ~/public_html/bot_hook.py
 chmod 755 ~/Shedule_bot/bot_hook.py
 ```
+
+> If you see `ln: failed to create symbolic link … File exists`, remove the old entry first:
+> ```bash
+> rm ~/public_html/bot_hook.py
+> ln -s ~/Shedule_bot/bot_hook.py ~/public_html/bot_hook.py
+> ```
 
 Verify it is reachable:
 
@@ -63,6 +77,7 @@ Expected output:
 Get your Telegram ID by messaging the bot `/start` (it appears in the reply).
 
 ```bash
+cd ~/Shedule_bot && source venv/bin/activate
 TZ=Europe/Kyiv python main.py --bootstrap-it <your_telegram_id>
 ```
 

@@ -29,6 +29,13 @@
 - 92 pre-existing tests: all green (zero regressions)
 - 21 new tests: all green
 
+### Post-QA fixes (found during Owner UAT)
+
+| Fix | File | Change |
+|-----|------|--------|
+| F6 — symlink path resolution | `bot_hook.py:11` | `os.path.abspath` → `os.path.realpath` |
+| F7 — venv package access | `bot_hook.py:12–14` | Added `_VENV` `sys.path` injection; Architect revised to use `sys.version_info` instead of hardcoded `"python3.11"` |
+
 ---
 
 ## Files changed
@@ -58,6 +65,8 @@
 | AD-S005-004 | Secret token validated before 200 response — 403 returned to Telegram if wrong             |
 | AD-S005-005 | `bot_hook.py` imports only from `db.py`; zero dependency on `main.py` — no regression risk |
 | AD-S005-006 | `upsert_user` preserves role on name update — prevents accidental demotion                 |
+| AD-S005-007 | `os.path.realpath(__file__)` used for `_ROOT` — correctly resolves path when executed via symlink from `public_html/` (found as F6 during Owner UAT) |
+| AD-S005-008 | Venv `site-packages` injected into `sys.path` at startup via `sys.version_info` — CGI base Python accesses venv packages without separate `--user` install (found as F7 during Owner UAT) |
 
 ---
 

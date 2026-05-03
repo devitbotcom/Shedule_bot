@@ -110,6 +110,30 @@ Errors: catch all exceptions, send "⚠️ Internal error" to user, log to file,
 
 ---
 
+### AD-S005-007 — Symlink-safe `_ROOT` resolution
+
+`bot_hook.py` uses `os.path.realpath(__file__)` (not `os.path.abspath`) to resolve `_ROOT`. When the CGI file is executed via a symlink from `public_html/`, `abspath` would resolve to the symlink's directory (`~/public_html/`), making all relative imports fail. `realpath` follows the symlink to the actual source file location (`~/Shedule_bot/`).
+
+**Rule:** any script that may be symlinked and needs sibling imports must use `realpath`.
+
+---
+
+### AD-S005-008 — Venv package availability for CGI
+
+The CGI shebang (`#!/opt/alt/python311/bin/python3.11`) uses the base system Python, which cannot see the project venv. Rather than requiring a separate `--user` install (two package sets to keep in sync), `bot_hook.py` injects the venv `site-packages` directory into `sys.path` at startup:
+
+```python
+_VENV = os.path.join(_ROOT, "venv", "lib",
+                     f"python{sys.version_info.major}.{sys.version_info.minor}",
+                     "site-packages")
+if os.path.isdir(_VENV):
+    sys.path.insert(0, _VENV)
+```
+
+The version string is derived from the running interpreter (`sys.version_info`) — not hardcoded — so it remains correct if the Python minor version changes. The `isdir` guard is intentionally permissive: if the venv is absent the script proceeds and fails at the first missing import, producing a diagnosable error rather than silent misbehaviour.
+
+---
+
 ### AD-S005-006 — Webhook registration
 
 New CLI flag `--register-webhook` added to `main.py` / `cli.py`. Calls Telegram `setWebhook` with `url` + `secret_token`. Run once by IT after deployment. Idempotent.

@@ -82,6 +82,8 @@
 | F3 | 🔵 Low    | `main.py:328`                 | `run_bootstrap_it` hardcodes name `"IT Admin"`. Self-corrects on first `/start` (upsert preserves role). Cosmetic.                                                                                    |
 | F4 | 🔵 Low    | `tests/test_cli.py`           | No tests for `--register-webhook` or `--bootstrap-it` flags. Mutual exclusion guard and `RunMode.bootstrap_it` field not covered by CLI tests.                                                        |
 | F5 | 🔵 Low    | `bot_hook.main()`             | CGI scaffolding (403 branch, `CONTENT_LENGTH` stdin read, `sys.stdout` header write) not unit-tested. Expected for S005 scope; note for future integration test coverage.                             |
+| F6 | 🔴 Blocker | `bot_hook.py:11`             | `os.path.abspath(__file__)` does not follow symlinks. When executed via symlink from `public_html/`, `_ROOT` resolved to `~/public_html/` instead of `~/Shedule_bot/`, causing `ImportError` on `from db import …`. Result: empty HTTP response. **Found during Owner UAT. Fixed: changed to `os.path.realpath`.** |
+| F7 | 🔴 Blocker | `bot_hook.py:14`             | CGI shebang uses base `/opt/alt/python311/bin/python3.11`, which cannot see venv packages. `import requests` failed silently, producing empty response. **Found during Owner UAT. Fixed: `_VENV` site-packages injected into `sys.path` at startup.** |
 
 ### F2 — suggested fix
 
@@ -110,7 +112,7 @@ assert "Використання" in sent.last_text
 
 ## Overall verdict
 
-**✅ PASS — no blockers.**  
-F2 is the only finding worth addressing before Owner UAT (tightening one assertion). F1–F5 are all 🔵 Low. Critical security path (role gating for `/setrole`) correctly implemented and tested.
+**✅ PASS — all blockers resolved.**  
+Initial QA pass found no blockers (F1–F5 all 🔵 Low). Two blockers (F6, F7) were discovered during Owner UAT and fixed by Developer. Architect review identified a fragility in the F7 fix (hardcoded Python version string); Developer revised to use `sys.version_info`. All fixes verified by test suite.
 
-**Recommended action before UAT:** fix F2 (one-line change). F1–F5 may be deferred.
+**Open low items:** F1 (dead import), F3 (hardcoded name), F4 (missing CLI tests), F5 (CGI path not unit-tested). May be deferred to a future sprint.
