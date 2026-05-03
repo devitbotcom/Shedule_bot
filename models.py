@@ -21,7 +21,7 @@ class ShiftContext:
 
 @dataclass
 class RunMode:
-    mode: str              # 'health' | 'dry_run' | 'production' | 'reload_schedule'
+    mode: str              # 'health' | 'dry_run' | 'production' | 'reload_schedule' | 'gen_crontab' | 'verify_cron'
     employee: Optional[str] = None
     date: Optional[str] = None       # ISO 8601 override; None = today
     shift_type: Optional[str] = None # day_type filter; None = all types (set by gen_crontab)

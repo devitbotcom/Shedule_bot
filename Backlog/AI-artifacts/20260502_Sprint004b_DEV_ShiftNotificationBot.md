@@ -3,79 +3,114 @@
 **Sprint:** 004b  
 **Role:** Developer  
 **Date:** 2026-05-03  
-**Status:** ✅ COMPLETE — D1–D11 done  
+**Status:** ✅ COMPLETE — D1–D15 implemented; QA-005/008/009 fixed  
 **Arch ref:** `20260502_Sprint004b_ARCH_ShiftNotificationBot.md`
 
 ---
 
 ## Deliverables
 
-| #  | Deliverable                          | Status | Notes |
-|----|--------------------------------------|--------|-------|
-| D1 | README — Production Install (P0–P11) | ✅ | New `## For Production (cPanel)` section added |
-| D2 | README — server-local cron conversion table | ✅ | P8; corrected 2026-05-03 — EDT times (−7h), formula, midnight-crossing note for `other`; was UTC (UAT finding 004b-4) |
-| D3 | README — Production maintenance      | ✅ | P9 table maps Docker → venv commands |
-| D4 | README — Security hardening          | ✅ | P7; two-step chmod (deploy + post-first-run) |
-| D5 | README — Log retention cron          | ✅ | P8; weekly Sunday 03:00 EDT server local time |
-| D9 | README — Production cron management  | ✅ | P9b; update workflow, manual run, DST procedure (UAT finding 004b-3) |
-| D6 | `.env.example` — absolute paths      | ✅ | Production block added as commented section |
-| D7 | `main.py` — `_check_clock_drift()`   | ✅ | Called at top of `run_production()`; HTTPS endpoint |
-| D8  | `tests/test_clock_drift.py`                    | ✅ | 4 tests; 77/77 suite passing |
-| D10 | `main.py` — `[SCHEDULE]` line in `run_health()` | ✅ | Calls `_shift_hours()`; non-blocking on error (AD-S004b-009) |
-| D11 | `main.py` — `[ENV TIME]` + `[TZ OFFSET]` lines  | ✅ | subprocess `unset TZ`; offset comparison; non-blocking (AD-S004b-010) |
-| D12 | `tests/test_health_extensions.py`              | ✅ | 5 tests; 82/82 suite passing |
+| #   | Deliverable                                          | Status | Notes |
+|-----|------------------------------------------------------|--------|-------|
+| D1  | DEPLOY.md — Production Install (P0–P12)              | ✅ | Split from README.md; standalone production guide |
+| D2  | DEPLOY.md — server-local cron times via `--gen-crontab` | ✅ | P8 replaced with command; was manual table (UAT 004b-4) |
+| D3  | DEPLOY.md — Production maintenance table             | ✅ | P9; includes `--gen-crontab` entry |
+| D4  | DEPLOY.md — Security hardening                       | ✅ | P7; two-step chmod (deploy + post-first-run) |
+| D5  | DEPLOY.md — Log retention cron                       | ✅ | Included in `--gen-crontab` output |
+| D6  | `.env.example` — absolute path placeholders          | ✅ | Production block added as commented section |
+| D7  | `main.py` — `_check_clock_drift()`                   | ✅ | Called at top of `run_production()`; HTTPS endpoint |
+| D8  | `tests/test_clock_drift.py`                          | ✅ | 4 tests |
+| D9  | DEPLOY.md — Production cron management (P9b)         | ✅ | Update workflow uses `--gen-crontab`; DST procedure; manual run (UAT 004b-3) |
+| D10 | `main.py` — `[SCHEDULE]` line in `run_health()`      | ✅ | Calls `_shift_hours()`; non-blocking (AD-S004b-009) |
+| D11 | `main.py` — `[ENV TIME]` + `[TZ OFFSET]` lines       | ✅ | subprocess `unset TZ`; offset comparison; non-blocking (AD-S004b-010) |
+| D11b| `tests/test_health_extensions.py`                    | ✅ | 5 tests covering D10 and D11 |
+| D12 | `cli.py` + `main.py` — `--gen-crontab` command       | ✅ | Reads shift_hours + server offset; prints 5 cron entries (AD-S004b-011) |
+| D13 | `cli.py` + `main.py` — `--verify-cron` command       | ✅ | Sends Telegram confirmation; exits 0/1 (AD-S004b-012) |
+| D14 | DEPLOY.md P8 — replaced manual table with `--gen-crontab` | ✅ | QA-006/007 resolved |
+| D15 | `tests/test_gen_crontab.py`                          | ✅ | 11 tests; QA-008 open (hardcoded shift types) |
 
 ---
 
 ## Code Changes
 
+### `config.py` (UAT 004b-6 fix)
+
+- Added `import time`
+- Added `time.tzset()` call after `load_dotenv()` when `TZ` env var is set — ensures `datetime.now()` uses the correct timezone when running manually without shell TZ prefix
+
 ### `main.py`
 
-- Added `import requests` (top-level import; already a project dependency)
-- Added `_check_clock_drift() -> None` — queries `https://worldtimeapi.org/api/timezone/UTC`, logs delta; WARNING if > 300s; non-blocking on any exception
+- Added `import subprocess` (stdlib, no new dependency)
+- Added `_check_clock_drift() -> None` — queries `https://worldtimeapi.org/api/timezone/UTC`, logs delta; WARNING if > 300s; non-blocking
 - Called `_check_clock_drift()` as first line of `run_production()`
+- Added `[SCHEDULE]` block in `run_health()`: calls `_shift_hours(config)`, prints labor/holiday/other times; non-blocking
+- Added `[ENV TIME]` + `[TZ OFFSET]` block in `run_health()`: subprocess `unset TZ; date; date +%z; date +%Z`; offset comparison; both lines printed after all calculations; non-blocking
+- Added `_shift_time_to_server(kyiv_hhmm, bot_offset_h, server_offset_h) -> tuple` — pure conversion function
+- Added `run_gen_crontab(config)` — reads shift_hours + server offset via subprocess; prints 5 ready-to-paste cron entries including ~5-min verification entry; non-blocking on offset failure
+- Added `run_verify_cron(config)` — sends `✅ Cron active` to `TELEGRAM_GROUP_CHAT_ID`; exits 0/1
+- Added dispatch branches in `main()` for `gen_crontab` and `verify_cron` modes
+
+### `cli.py`
+
+- Added `--gen-crontab` argument
+- Added `--verify-cron` argument
+- Added mutual exclusion guards for both new modes
+- Added mode determination branches (before `reload_schedule`)
+
+### `models.py`
+
+- Updated `mode` field comment to include `'gen_crontab'` and `'verify_cron'`
 
 ### `tests/test_clock_drift.py` (new)
 
-Four test cases:
-1. `test_clock_drift_ok_logs_info` — API returns current time → INFO logged, no WARNING
-2. `test_clock_drift_warning_when_delta_exceeds_threshold` — API returns time 400s in past → WARNING logged
-3. `test_clock_drift_warning_when_api_unreachable` — Exception raised by requests → WARNING "skipped" logged
-4. `test_clock_drift_does_not_raise_on_api_failure` — Exception raised → function returns cleanly, no propagation
-
-### `.env.example`
-
-Added commented production block showing absolute-path alternatives for `XLSX_PATH`, `DB_PATH`, `LOG_DIR` with `<username>` placeholder.
-
-### `main.py` — post-UAT additions (2026-05-03)
-
-- Added `import subprocess` (stdlib, no new dependency)
-- `run_health()` — added `[SCHEDULE]` block: calls `_shift_hours(config)`, prints `labor/holiday/other` times; non-blocking on exception
-- `run_health()` — added `[ENV TIME]` + `[TZ OFFSET]` block: subprocess `unset TZ; date; date +%z; date +%Z` to get server-native time; offset computed from bot's `utcoffset()` vs server's `date +%z`; non-blocking on exception
+4 tests: clock OK → INFO; delta > 300s → WARNING; API unreachable → WARNING; no exception raised on failure.
 
 ### `tests/test_health_extensions.py` (new)
 
-Five test cases:
-1. `test_schedule_line_shows_shift_hours` — `[SCHEDULE]` line appears with correct values
-2. `test_schedule_line_shows_error_when_mapping_unreadable` — `_shift_hours` raises → `[SCHEDULE] ❌` printed, no crash
-3. `test_env_time_and_offset_shown` — subprocess returns fake EDT output → `[ENV TIME]` and `[TZ OFFSET]` present
-4. `test_env_time_shows_error_when_subprocess_fails` — subprocess raises → `[ENV TIME] ❌` printed
-5. `test_env_time_error_does_not_raise` — subprocess raises → only `SystemExit` from `run_health`, no propagation
+5 tests: `[SCHEDULE]` shows values; `[SCHEDULE]` error case; `[ENV TIME]`/`[TZ OFFSET]` shown; subprocess fail → error line; no-raise guarantee.
+
+### `tests/test_gen_crontab.py` (replaced — was Docker gen_crontab.py tests)
+
+11 tests:
+- 4 pure unit tests for `_shift_time_to_server`: labor/holiday/other conversions, midnight-crossing, same-timezone
+- 5 tests for `run_gen_crontab`: all shift types present, verify entry present, install path correct, placeholder on offset failure, log retention present
+- 2 tests for `run_verify_cron`: sends to correct chat_id, exits 1 on failure
 
 ### `README.md`
 
-- Added `## For Production (cPanel — Namecheap)` section (P0–P12) *(original)*
-- Added P12 Clock drift monitor — explains "skipped" vs "drift" warnings (RISK-001 mitigation)
-- Removed "Coming next — S004b" trailer
-- **Post-UAT correction (2026-05-03):** P8 cron table rewritten for EDT server (was UTC); formula `shift_hours − 7h` added; midnight-crossing note for `other` entry added; log retention comment updated to "EDT server local time"
-- **Post-UAT addition (2026-05-03):** P9b "Managing cPanel cron entries" — update workflow, manual run procedure, DST verification steps
+- Rewritten to contain Docker/local setup only (sections 0–10 + developer reference)
+- Added cross-reference link to DEPLOY.md
+- Added `--gen-crontab` and `--verify-cron` to CLI reference table
+
+### `DEPLOY.md` (new file, split from README.md)
+
+- All production content (P0–P12) moved here
+- Uses `Shedule_bot` as folder name throughout (actual `git clone` output)
+- P6b added — first production run step
+- P8 replaced with `--gen-crontab` command
+- P9b updated — shift_hours change workflow uses `--gen-crontab`; DST procedure present
+- Cross-reference link to README.md at top
+
+### `.gitignore`
+
+- Added `venv/` under `# Python` section (UAT finding 004b-5)
 
 ---
 
 ## Test Results
 
 ```
-82 passed in 0.49s
+87 passed in 0.38s
 ```
 
 All pre-existing tests continue to pass. No regressions.
+
+---
+
+## QA Fixes
+
+| # | Issue | Fix |
+|---|-------|-----|
+| QA-008 | `run_gen_crontab` hardcoded shift types | Changed `for st in ("labor", "holiday", "other")` → `for st in hours.keys()` |
+| QA-009 | DEPLOY.md P9b DST section had old manual formula | Replaced with `--health` + `--gen-crontab` workflow |
+| QA-005 | DEPLOY.md P6b ambiguous about when messages are sent | Clarified: messages sent only if shifts exist today; DB created either way |

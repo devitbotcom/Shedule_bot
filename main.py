@@ -212,6 +212,13 @@ def run_reload_schedule(config: dict, dry_run: bool) -> None:
     sys.exit(0)
 
 
+def _shift_time_to_server(kyiv_hhmm: str, bot_offset_h: float, server_offset_h: float) -> tuple:
+    h, m = map(int, kyiv_hhmm.split(":"))
+    offset_minutes = round((bot_offset_h - server_offset_h) * 60)
+    total = (h * 60 + m - offset_minutes) % (24 * 60)
+    return total // 60, total % 60
+
+
 def _check_clock_drift() -> None:
     try:
         resp = requests.get("https://worldtimeapi.org/api/timezone/UTC", timeout=5)
@@ -287,6 +294,91 @@ def run_production(config: dict, run_mode: RunMode) -> None:
     sys.exit(0 if failed == 0 else 1)
 
 
+def run_gen_crontab(config: dict) -> None:
+    install_root = os.path.dirname(os.path.dirname(config["XLSX_PATH"]))
+    python_bin = os.path.join(install_root, "venv", "bin", "python")
+    main_script = os.path.join(install_root, "main.py")
+    tz = os.environ.get("TZ", "Europe/Kyiv")
+    bot_offset_h = datetime.now().astimezone().utcoffset().total_seconds() / 3600
+    hours = _shift_hours(config)
+
+    server_offset_h = None
+    server_now_hhmm = None
+    offset_ok = False
+    try:
+        result = subprocess.run(
+            ["bash", "-c", "unset TZ; date +%z; date +%H%M"],
+            capture_output=True, text=True, timeout=3,
+        )
+        lines = result.stdout.strip().splitlines()
+        offset_str, time_str = lines[0], lines[1]
+        sign = 1 if offset_str[0] == "+" else -1
+        server_offset_h = sign * (int(offset_str[1:3]) + int(offset_str[3:5]) / 60)
+        server_now_hhmm = time_str.strip()
+        offset_ok = True
+    except Exception:
+        pass
+
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    if offset_ok:
+        diff_h = bot_offset_h - server_offset_h
+        bot_abbr = datetime.now().astimezone().strftime("%Z")
+        tz_header = (
+            f"Kyiv={bot_abbr} UTC{int(bot_offset_h):+d} | "
+            f"Server=UTC{int(server_offset_h):+d} | Offset={diff_h:.0f}h"
+        )
+    else:
+        tz_header = "⚠️ Could not read server offset — replace <HOUR> and <MIN> manually"
+
+    print(f"# Generated: {now_str} ({tz})")
+    print(f"# {tz_header}")
+    print(f"# Install: {install_root}")
+    print(f"# Paste all entries into cPanel → Cron Jobs.")
+    print(f"# Add the last entry too — remove it after the Telegram confirmation arrives.")
+    print()
+
+    def _entry(shift_type):
+        hhmm = hours.get(shift_type, "09:00")
+        if offset_ok:
+            sh, sm = _shift_time_to_server(hhmm, bot_offset_h, server_offset_h)
+            return f"{sm:2d} {sh:2d} * * *  TZ={tz} {python_bin} {main_script} --production --shift-type {shift_type}"
+        return f"<MIN> <HOUR> * * *  TZ={tz} {python_bin} {main_script} --production --shift-type {shift_type}  # Kyiv={hhmm}"
+
+    print("# Shift notifications")
+    for st in hours.keys():
+        print(_entry(st))
+    print()
+
+    print("# Log retention (weekly, Sunday)")
+    print(f" 0  3 * * 0  find {config['LOG_DIR']} -name \"*.log\" -mtime +30 -delete")
+    print()
+
+    print("# Verification — REMOVE AFTER FIRST FIRE")
+    if offset_ok:
+        now_h, now_m = int(server_now_hhmm[:2]), int(server_now_hhmm[2:])
+        verify_total = (now_h * 60 + now_m + 5) % (24 * 60)
+        vh, vm = verify_total // 60, verify_total % 60
+        print(f"{vm:2d} {vh:2d} * * *  TZ={tz} {python_bin} {main_script} --verify-cron")
+    else:
+        print(f"<MIN> <HOUR> * * *  TZ={tz} {python_bin} {main_script} --verify-cron")
+
+    sys.exit(0)
+
+
+def run_verify_cron(config: dict) -> None:
+    adapter = TelegramAdapter(config["TELEGRAM_BOT_TOKEN"])
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    tz = os.environ.get("TZ", "")
+    message = f"✅ Cron active — schedule configured\nVerified: {now_str} ({tz})"
+    try:
+        adapter.send(config["TELEGRAM_GROUP_CHAT_ID"], message)
+        print("[VERIFY] ✅ Confirmation sent to Telegram group")
+        sys.exit(0)
+    except Exception as exc:
+        logging.error("Verification send failed: %s", exc)
+        sys.exit(1)
+
+
 def main() -> None:
     run_mode = parse_args()
     config = load_config()
@@ -308,6 +400,12 @@ def main() -> None:
     elif run_mode.mode == "production":
         init_db(config["DB_PATH"])
         run_production(config, run_mode)
+
+    elif run_mode.mode == "gen_crontab":
+        run_gen_crontab(config)
+
+    elif run_mode.mode == "verify_cron":
+        run_verify_cron(config)
 
 
 if __name__ == "__main__":

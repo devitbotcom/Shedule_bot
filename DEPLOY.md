@@ -96,13 +96,13 @@ cd ~/Shedule_bot && source venv/bin/activate && python main.py --dry-run
 
 ### P6b. First production run (manual)
 
-Verify that notifications send and confirm messages arrive in the Telegram group:
-
 ```bash
 cd ~/Shedule_bot && source venv/bin/activate && python main.py --production
 ```
 
-This also creates `shift_bot.db` — required for the second chmod step in P7.
+This creates `shift_bot.db` — required for the second chmod step in P7.
+
+If shifts are scheduled for today, notifications will be sent to the Telegram group — confirm they arrive. If there are no shifts today, the bot exits with `No shifts found for date: YYYY-MM-DD` — that is normal. The DB is created either way.
 
 ### P7. Security hardening
 
@@ -122,25 +122,19 @@ chmod 600 data/shift_bot.db
 
 ### P8. Configure cPanel cron jobs
 
-Go to **cPanel → Cron Jobs** and add four entries. For each entry, fill in the Minute, Hour, Day, Month, Weekday fields and paste the Command.
+Generate the cron entries from your current config:
 
-**Shift notifications — 3 entries:**
+```bash
+cd ~/Shedule_bot && source venv/bin/activate && TZ=Europe/Kyiv python main.py --gen-crontab
+```
 
-Times below are based on `shift_hours` defaults in `schedule_mapping.json` converted to server local time (Kyiv EEST UTC+3 − server EDT UTC-4 = 7h).
+The command prints 5 ready-to-paste entries — times calculated automatically from `shift_hours` and the server's timezone offset.
 
-| Time (server) | Min | Hour | Day | Month | Weekday | Command                                                                                                                              |
-|---------------|-----|------|-----|-------|---------|--------------------------------------------------------------------------------------------------------------------------------------|
-| 10:00         | 0   | 10   | *   | *     | *       | `TZ=Europe/Kyiv /home/<username>/Shedule_bot/venv/bin/python /home/<username>/Shedule_bot/main.py --production --shift-type labor`   |
-| 02:00         | 0   | 2    | *   | *     | *       | `TZ=Europe/Kyiv /home/<username>/Shedule_bot/venv/bin/python /home/<username>/Shedule_bot/main.py --production --shift-type holiday` |
-| 02:00         | 0   | 2    | *   | *     | *       | `TZ=Europe/Kyiv /home/<username>/Shedule_bot/venv/bin/python /home/<username>/Shedule_bot/main.py --production --shift-type other`   |
+Go to **cPanel → Cron Jobs** and add all 5 entries. For each line, fill in the Minute and Hour fields from the first two numbers, set Day / Month / Weekday to `*` (or `0` for the Sunday log entry), and paste the rest as the Command.
 
-> ⚠️ If you change `shift_hours` in `schedule_mapping.json`, recalculate: `cPanel time = shift_hours − (Kyiv offset − server offset)` and update these entries. See P9b.
+The last entry is a one-time verification — it fires ~5 minutes after you save it. When the Telegram confirmation message arrives, delete that entry from cPanel.
 
-**Log retention — 1 entry:**
-
-| Min | Hour | Day | Month | Weekday | Command                                                                        |
-|-----|------|-----|-------|---------|--------------------------------------------------------------------------------|
-| 0   | 3    | *   | *     | 0       | `find /home/<username>/Shedule_bot/data/logs -name "*.log" -mtime +30 -delete` |
+> ⚠️ Re-run `--gen-crontab` whenever you change `shift_hours` or after a DST transition — it always recalculates from current config. See P9b for the full update procedure.
 
 ### P9. Maintenance commands
 
@@ -159,15 +153,15 @@ cd ~/Shedule_bot && source venv/bin/activate
 | Force resend all    | `python main.py --production --force`                    |
 | Clear dedup records | `python main.py --reload-schedule`                       |
 | Send one shift type | `python main.py --production --shift-type labor`         |
+| Regenerate cron entries | `TZ=Europe/Kyiv python main.py --gen-crontab`        |
 
 ### P9b. Managing cPanel cron entries
 
 **When you change `shift_hours` in `schedule_mapping.json`:**
 
-1. Recalculate the new cPanel cron times using the formula from P8: `cPanel time = shift_hours − (Kyiv offset − server offset)`
-2. In **cPanel → Cron Jobs**, edit each of the 3 shift notification entries to the new time
-3. Verify: `cd ~/Shedule_bot && source venv/bin/activate && python main.py --health`
-4. Confirm the `[SCHEDULE]` line shows the new times
+1. Run `cd ~/Shedule_bot && source venv/bin/activate && TZ=Europe/Kyiv python main.py --gen-crontab`
+2. In **cPanel → Cron Jobs**, edit each of the 3 shift notification entries to the new times from the output
+3. Verify: `TZ=Europe/Kyiv python main.py --health` — confirm `[SCHEDULE]` shows the new times
 
 **If a cron entry fires at the wrong time or is missed — run manually:**
 
@@ -179,12 +173,12 @@ python main.py --production --shift-type labor
 
 **After a DST change (either Kyiv or server clocks):**
 
-1. Verify the current offset: run `date` on the server and compare to current Kyiv time
-2. Recalculate: `cPanel time = shift_hours − (new Kyiv offset − new server offset)`
-3. Update all 3 cron entries in **cPanel → Cron Jobs**
-4. Run a health check and confirm the clock drift log shows `Clock drift OK`
+1. Run `TZ=Europe/Kyiv python main.py --health` — confirm `[TZ OFFSET]` shows the new offset
+2. Run `TZ=Europe/Kyiv python main.py --gen-crontab` — it recalculates from the current offset automatically
+3. Update all 3 shift notification entries in **cPanel → Cron Jobs** with the new times from the output
+4. Confirm `Clock drift OK` in the next production log
 
-> ⚠️ **DST trap:** Kyiv and the server change clocks on different dates. The offset may stay the same (7h) or shift by 1h depending on which side changes first. Always verify by checking both clocks, not by assuming.
+> ⚠️ **DST trap:** Kyiv and the server change clocks on different dates. The offset may stay the same or shift by 1h — always verify with `--health` first, do not assume.
 
 ### P10. Update schedule monthly
 

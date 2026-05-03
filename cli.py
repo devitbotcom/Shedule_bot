@@ -25,10 +25,19 @@ def parse_args() -> RunMode:
                              "(set automatically by gen_crontab.py; requires --production)")
     parser.add_argument("--reload-schedule", action="store_true",
                         help="Validate XLSX and clear dedup records for its dates")
+    parser.add_argument("--gen-crontab", action="store_true",
+                        help="Print ready-to-paste cPanel cron entries calculated from shift_hours and server timezone")
+    parser.add_argument("--verify-cron", action="store_true",
+                        help="Send Telegram confirmation that cron is active (used by the verification cron entry)")
 
     args = parser.parse_args()
 
     # Validate combinations
+    if args.gen_crontab and any([args.production, args.dry_run, args.reload_schedule, args.verify_cron]):
+        parser.error("--gen-crontab cannot be combined with other modes")
+    if args.verify_cron and any([args.production, args.dry_run, args.reload_schedule, args.gen_crontab]):
+        parser.error("--verify-cron cannot be combined with other modes")
+
     if args.force and not args.production:
         parser.error("--force requires --production")
 
@@ -55,7 +64,11 @@ def parse_args() -> RunMode:
         parser.error("--reload-schedule and --production are mutually exclusive")
 
     # Determine mode
-    if args.reload_schedule:
+    if args.gen_crontab:
+        mode = "gen_crontab"
+    elif args.verify_cron:
+        mode = "verify_cron"
+    elif args.reload_schedule:
         mode = "reload_schedule"
     elif args.dry_run:
         mode = "dry_run"

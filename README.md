@@ -214,6 +214,8 @@ docker compose run --rm bot pytest
 | `python main.py --production --force`        | Resend all, ignore deduplication          |
 | `python main.py --reload-schedule`           | Clear dedup records so cron re-sends      |
 | `python main.py --reload-schedule --dry-run` | Preview what would be cleared             |
+| `python main.py --gen-crontab`               | Print cPanel cron entries calculated from current `shift_hours` and server timezone |
+| `python main.py --verify-cron`               | Send Telegram confirmation that cron is active (used by verification entry) |
 
 ### Project structure
 
