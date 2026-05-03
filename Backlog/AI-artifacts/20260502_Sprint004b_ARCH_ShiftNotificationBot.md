@@ -245,6 +245,6 @@ None. All OQs resolved:
 | Role      | Name | Date       | Status                                                                |
 |-----------|------|------------|-----------------------------------------------------------------------|
 | Architect | AI   | 2026-05-03 | ✅ REVISED — OQ-3 corrected, AD-S004b-001 table corrected, D9 added; ready for Developer (D2+D9) |
-| Developer | AI   | 2026-05-02 | ✅ D1–D8 COMPLETE — D2 correction + D9 pending                         |
+| Developer | AI   | 2026-05-03 | ✅ COMPLETE — D1–D9 done; D2 corrected + D9 added post-UAT             |
 | QA        | AI   | 2026-05-02 | ✅ SIGNED OFF — QA-001/002/003 deferred to UAT                         |
 | Owner     |      | 2026-05-03 | ⏸ IN PROGRESS — see `20260503_Sprint004b_UAT_ShiftNotificationBot.md` |

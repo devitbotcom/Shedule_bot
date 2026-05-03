@@ -27,6 +27,7 @@ key.properties
 
 # Python
 .venv/
+venv/
 __pycache__/
 *.pyc
 *.pyo

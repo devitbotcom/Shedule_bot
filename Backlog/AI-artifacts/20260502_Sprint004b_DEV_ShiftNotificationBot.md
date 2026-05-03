@@ -2,8 +2,8 @@
 
 **Sprint:** 004b  
 **Role:** Developer  
-**Date:** 2026-05-02  
-**Status:** ✅ COMPLETE  
+**Date:** 2026-05-03  
+**Status:** ✅ COMPLETE (D2 corrected + D9 added post-UAT 2026-05-03)  
 **Arch ref:** `20260502_Sprint004b_ARCH_ShiftNotificationBot.md`
 
 ---
@@ -13,10 +13,11 @@
 | #  | Deliverable                          | Status | Notes |
 |----|--------------------------------------|--------|-------|
 | D1 | README — Production Install (P0–P11) | ✅ | New `## For Production (cPanel)` section added |
-| D2 | README — UTC conversion table        | ✅ | In P8; includes DST note |
+| D2 | README — server-local cron conversion table | ✅ | P8; corrected 2026-05-03 — EDT times (−7h), formula, midnight-crossing note for `other`; was UTC (UAT finding 004b-4) |
 | D3 | README — Production maintenance      | ✅ | P9 table maps Docker → venv commands |
 | D4 | README — Security hardening          | ✅ | P7; two-step chmod (deploy + post-first-run) |
-| D5 | README — Log retention cron          | ✅ | P8; weekly Sunday 03:00 UTC entry |
+| D5 | README — Log retention cron          | ✅ | P8; weekly Sunday 03:00 EDT server local time |
+| D9 | README — Production cron management  | ✅ | P9b; update workflow, manual run, DST procedure (UAT finding 004b-3) |
 | D6 | `.env.example` — absolute paths      | ✅ | Production block added as commented section |
 | D7 | `main.py` — `_check_clock_drift()`   | ✅ | Called at top of `run_production()`; HTTPS endpoint |
 | D8 | `tests/test_clock_drift.py`          | ✅ | 4 tests; 77/77 suite passing |
@@ -45,9 +46,11 @@ Added commented production block showing absolute-path alternatives for `XLSX_PA
 
 ### `README.md`
 
-- Added `## For Production (cPanel — Namecheap)` section (P0–P12)
+- Added `## For Production (cPanel — Namecheap)` section (P0–P12) *(original)*
 - Added P12 Clock drift monitor — explains "skipped" vs "drift" warnings (RISK-001 mitigation)
 - Removed "Coming next — S004b" trailer
+- **Post-UAT correction (2026-05-03):** P8 cron table rewritten for EDT server (was UTC); formula `shift_hours − 7h` added; midnight-crossing note for `other` entry added; log retention comment updated to "EDT server local time"
+- **Post-UAT addition (2026-05-03):** P9b "Managing cPanel cron entries" — update workflow, manual run procedure, DST verification steps
 
 ---
 

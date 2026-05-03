@@ -279,27 +279,37 @@ In **cPanel → Cron Jobs**, add four entries.
 
 **Shift notifications — 3 entries (one per shift type):**
 
-Cron times are your `shift_hours` values converted to UTC. In summer (EEST, UTC+3) subtract 3 h; in winter (EET, UTC+2) subtract 2 h.
+Cron times are your `shift_hours` values converted to server local time. Formula:
 
-| Shift type | `shift_hours` (Kyiv) | cPanel time (UTC, summer EEST) | Same day?                |
-|------------|----------------------|--------------------------------|--------------------------|
-| labor      | 17:00                | 14:00                          | ✅                        |
-| holiday    | 17:34                | 14:34                          | ✅                        |
-| other      | 01:25                | 22:25                          | ⚠️ previous calendar day |
+```
+cPanel time = shift_hours − (Kyiv UTC offset − server UTC offset)
+            = shift_hours − (UTC+3 − UTC-4)
+            = shift_hours − 7h    ← current value, summer 2026 (EEST / EDT)
+```
 
-> ⚠️ **DST reminder:** Update all 3 cron times when clocks change (last Sunday of March and October).
+If the result is negative, subtract one calendar day. Recalculate whenever either timezone changes clocks — the 7h is derived, not a fixed constant.
+
+| Shift type | `shift_hours` (Kyiv EEST) | cPanel time (server local) | Same day?                |
+|------------|--------------------------|-------------------|--------------------------|
+| labor      | 17:00                    | 10:00             | ✅                        |
+| holiday    | 17:34                    | 10:34             | ✅                        |
+| other      | 01:25                    | 18:25             | ⚠️ previous calendar day |
+
+> ⚠️ **DST reminder:** Both Kyiv and the server observe DST on different schedules. Verify the offset and update all 3 cron entries whenever either timezone changes clocks. Current offset: 7 h (EEST UTC+3 − EDT UTC-4). Winter offset also 7 h (EET UTC+2 − EST UTC-5) — but confirm at each transition.
 >
-> ⚠️ **Whenever you change `shift_hours`:** recalculate the UTC times and update all 3 cPanel cron entries.
+> ⚠️ **Whenever you change `shift_hours`:** recalculate the server-local times using the formula above and update all 3 cPanel cron entries.
 
-Each entry uses the `TZ=Europe/Kyiv` prefix so the bot sees Kyiv date, not server UTC date:
+Each entry uses the `TZ=Europe/Kyiv` prefix so the bot sees Kyiv date, not server local date:
 
 ```
-0  14 * * *  TZ=Europe/Kyiv /home/<username>/shift_bot/venv/bin/python /home/<username>/shift_bot/main.py --production --shift-type labor
-34 14 * * *  TZ=Europe/Kyiv /home/<username>/shift_bot/venv/bin/python /home/<username>/shift_bot/main.py --production --shift-type holiday
-25 22 * * *  TZ=Europe/Kyiv /home/<username>/shift_bot/venv/bin/python /home/<username>/shift_bot/main.py --production --shift-type other
+0  10 * * *  TZ=Europe/Kyiv /home/<username>/shift_bot/venv/bin/python /home/<username>/shift_bot/main.py --production --shift-type labor
+34 10 * * *  TZ=Europe/Kyiv /home/<username>/shift_bot/venv/bin/python /home/<username>/shift_bot/main.py --production --shift-type holiday
+25 18 * * *  TZ=Europe/Kyiv /home/<username>/shift_bot/venv/bin/python /home/<username>/shift_bot/main.py --production --shift-type other
 ```
 
-**Log retention — 1 entry (weekly, Sunday 03:00 UTC):**
+> ℹ️ The `other` entry fires at 18:25 EDT the evening before. With `TZ=Europe/Kyiv`, the Python process sees 01:25 Kyiv time on the next calendar day — which is the correct Kyiv date for that shift. This is intentional.
+
+**Log retention — 1 entry (weekly, Sunday 03:00 EDT server local time):**
 
 ```
 0 3 * * 0  find /home/<username>/shift_bot/data/logs -name "*.log" -mtime +30 -delete
@@ -317,6 +327,34 @@ Replace `docker compose run --rm bot` with the venv prefix `cd ~/shift_bot && so
 | Resend one person   | `python main.py --production --employee "Name"` |
 | Force resend all    | `python main.py --production --force`           |
 | Clear dedup records | `python main.py --reload-schedule`              |
+
+### P9b. Managing cPanel cron entries
+
+This is the production equivalent of `docker compose restart cron`.
+
+**When you change `shift_hours` in `schedule_mapping.json`:**
+
+1. Recalculate the new cPanel cron times using the formula from P8: `cPanel time = shift_hours − (Kyiv offset − server offset)`
+2. In **cPanel → Cron Jobs**, edit each of the 3 shift notification entries to the new time
+3. Verify with a health check: `cd ~/shift_bot && source venv/bin/activate && python main.py`
+4. Confirm the `[SCHEDULE]` line shows the new times (available after S005 is deployed)
+
+**If a cron entry fires at the wrong time or is missed — run manually:**
+
+```bash
+cd ~/shift_bot && source venv/bin/activate
+python main.py --production --shift-type labor
+# or: --shift-type holiday / --shift-type other
+```
+
+**After a DST change (either Kyiv or server clocks):**
+
+1. Verify the current offset: run `date` on the server and compare to current Kyiv time
+2. Recalculate: `cPanel time = shift_hours − (new Kyiv offset − new server offset)`
+3. Update all 3 cron entries in **cPanel → Cron Jobs**
+4. Run a health check and confirm the clock drift log shows `Clock drift OK`
+
+> ⚠️ **DST trap:** Kyiv and the server change clocks on different dates. The offset may stay the same (7h) or shift by 1h depending on which side changes first. Always verify by checking both clocks, not by assuming.
 
 ### P10. Update schedule monthly
 
@@ -348,7 +386,7 @@ Clock drift: server deviates from world time by 3720s — check server NTP or DS
 Clock drift check skipped — time API unreachable
 ```
 
-A `WARNING: Clock drift check skipped` line means the public time API (`worldtimeapi.org`) was temporarily unreachable — **this is not a clock drift event**. If it appears repeatedly over several days, check the API status. A `WARNING: Clock drift: server deviates...` line means the server clock itself is wrong — contact hosting support or recalculate cron UTC times for DST.
+A `WARNING: Clock drift check skipped` line means the public time API (`worldtimeapi.org`) was temporarily unreachable — **this is not a clock drift event**. If it appears repeatedly over several days, check the API status. A `WARNING: Clock drift: server deviates...` line means the server clock itself is wrong — contact hosting support or recalculate cron times for DST.
 
 ---
 

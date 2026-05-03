@@ -103,3 +103,26 @@ Correct cron times for an EDT server (UTC-4, EEST = UTC+3, offset = 7h):
 ARCH action: ✅ DONE — AD-S004b-001 and OQ-3 corrected in `20260502_Sprint004b_ARCH_ShiftNotificationBot.md` (2026-05-03). Developer must fix README (D2 correction + D9 new section).
 
 Quality primitive was updated? — Yes: the `export TZ=` masking trap should be added to the quality guide so future deployments verify server timezone without shell overrides active.
+
+
+### 004b-5 Unexpected files to track in GIT on prod [CRITICAL] — ✅ FIXED
+
+Actual:
+```console
+[itbomenf@server129 ~]$ cd Shedule_bot/
+[itbomenf@server129 Shedule_bot]$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	venv/
+```
+
+Expected: `git status` shows no untracked files (clean working tree).
+
+Root cause: `.gitignore` covered `.venv/` but not `venv/` — the convention used on the server.
+
+Fix: `venv/` added to `.gitignore` (2026-05-03).
+
+Quality primitive was updated? — Yes: rule added to `AI-assistance/ext/backend-python.md` — `.gitignore` must cover all local runtime artifacts; QA must run `git status` on a clean checkout before release.
