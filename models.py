@@ -21,9 +21,10 @@ class ShiftContext:
 
 @dataclass
 class RunMode:
-    mode: str              # 'health' | 'dry_run' | 'production' | 'reload_schedule' | 'gen_crontab' | 'verify_cron'
+    mode: str              # 'health' | 'dry_run' | 'production' | 'reload_schedule' | 'gen_crontab' | 'verify_cron' | 'register_webhook' | 'bootstrap_it'
     employee: Optional[str] = None
     date: Optional[str] = None       # ISO 8601 override; None = today
     shift_type: Optional[str] = None # day_type filter; None = all types (set by gen_crontab)
     force: bool = False
     dry_run: bool = False
+    bootstrap_it: Optional[str] = None  # telegram_id for --bootstrap-it

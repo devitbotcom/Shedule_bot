@@ -29,10 +29,18 @@ def parse_args() -> RunMode:
                         help="Print ready-to-paste cPanel cron entries calculated from shift_hours and server timezone")
     parser.add_argument("--verify-cron", action="store_true",
                         help="Send Telegram confirmation that cron is active (used by the verification cron entry)")
+    parser.add_argument("--register-webhook", action="store_true",
+                        help="Register Telegram webhook URL (one-time setup, requires WEBHOOK_URL in .env)")
+    parser.add_argument("--bootstrap-it", metavar="TELEGRAM_ID",
+                        help="Create the first IT admin user in the bot DB (one-time setup)")
 
     args = parser.parse_args()
 
     # Validate combinations
+    _admin_modes = [args.register_webhook, bool(args.bootstrap_it)]
+    _send_modes = [args.production, args.dry_run, args.reload_schedule, args.gen_crontab, args.verify_cron]
+    if any(_admin_modes) and any(_send_modes):
+        parser.error("--register-webhook and --bootstrap-it cannot be combined with other modes")
     if args.gen_crontab and any([args.production, args.dry_run, args.reload_schedule, args.verify_cron]):
         parser.error("--gen-crontab cannot be combined with other modes")
     if args.verify_cron and any([args.production, args.dry_run, args.reload_schedule, args.gen_crontab]):
@@ -64,7 +72,11 @@ def parse_args() -> RunMode:
         parser.error("--reload-schedule and --production are mutually exclusive")
 
     # Determine mode
-    if args.gen_crontab:
+    if args.register_webhook:
+        mode = "register_webhook"
+    elif args.bootstrap_it:
+        mode = "bootstrap_it"
+    elif args.gen_crontab:
         mode = "gen_crontab"
     elif args.verify_cron:
         mode = "verify_cron"
@@ -84,4 +96,5 @@ def parse_args() -> RunMode:
         shift_type=args.shift_type,
         force=args.force,
         dry_run=args.dry_run,
+        bootstrap_it=args.bootstrap_it,
     )

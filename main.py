@@ -12,6 +12,7 @@ from config import load_config
 from db import (
     get_last_run_summary, get_pending_count, init_db,
     clear_notifications_for_dates, was_notified, record_notification,
+    init_users_table, init_conversations_table, upsert_user, set_user_role,
 )
 from messenger.telegram_adapter import TelegramAdapter
 from models import RunMode, ShiftContext
@@ -294,6 +295,42 @@ def run_production(config: dict, run_mode: RunMode) -> None:
     sys.exit(0 if failed == 0 else 1)
 
 
+def run_register_webhook(config: dict) -> None:
+    webhook_url = os.environ.get("WEBHOOK_URL", "")
+    secret = os.environ.get("WEBHOOK_SECRET_TOKEN", "")
+    if not webhook_url:
+        print("[WEBHOOK] ❌ WEBHOOK_URL not set in .env")
+        sys.exit(1)
+    payload: dict = {"url": webhook_url}
+    if secret:
+        payload["secret_token"] = secret
+    try:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{config['TELEGRAM_BOT_TOKEN']}/setWebhook",
+            json=payload,
+            timeout=10,
+        )
+        data = resp.json()
+        if data.get("ok"):
+            print(f"[WEBHOOK] ✅ Registered: {webhook_url}")
+        else:
+            print(f"[WEBHOOK] ❌ Failed: {data.get('description', 'unknown error')}")
+            sys.exit(1)
+    except Exception as exc:
+        print(f"[WEBHOOK] ❌ Error: {exc}")
+        sys.exit(1)
+    sys.exit(0)
+
+
+def run_bootstrap_it(config: dict, telegram_id: str) -> None:
+    init_users_table(config["DB_PATH"])
+    init_conversations_table(config["DB_PATH"])
+    upsert_user(config["DB_PATH"], telegram_id, "IT Admin")
+    set_user_role(config["DB_PATH"], telegram_id, "it")
+    print(f"[BOOTSTRAP] ✅ IT user {telegram_id} registered")
+    sys.exit(0)
+
+
 def run_gen_crontab(config: dict) -> None:
     install_root = os.path.dirname(os.path.dirname(config["XLSX_PATH"]))
     python_bin = os.path.join(install_root, "venv", "bin", "python")
@@ -415,6 +452,12 @@ def main() -> None:
 
     elif run_mode.mode == "verify_cron":
         run_verify_cron(config)
+
+    elif run_mode.mode == "register_webhook":
+        run_register_webhook(config)
+
+    elif run_mode.mode == "bootstrap_it":
+        run_bootstrap_it(config, run_mode.bootstrap_it)
 
 
 if __name__ == "__main__":

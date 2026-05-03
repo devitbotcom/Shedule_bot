@@ -2,7 +2,7 @@
 
 Sends one Telegram message per duty shift to a shared staff group. Runs automatically via a Docker cron service locally, or as a cPanel cron job on Namecheap in production.
 
-> **Production deploy & maintenance:** see [DEPLOY.md](DEPLOY.md)
+> **Production deploy & maintenance:** see [DEPLOY.md](readme_DEPLOY.md)
 
 ---
 
