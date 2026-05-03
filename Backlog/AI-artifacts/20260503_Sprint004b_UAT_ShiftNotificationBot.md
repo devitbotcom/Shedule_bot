@@ -10,7 +10,7 @@
 
 '''
 
-### 004b-1 Extend health with shift schedule [HIGH] — ⏸ OPEN
+### 004b-1 Extend health with shift schedule [HIGH] — UAT
 
 Actual:
 ```console
@@ -148,3 +148,20 @@ Sun May  3 03:07:03 EDT 2026
 
 Ecpected:
 meaningful info for maintainers to show
+
+---
+
+### 004b-7 `--gen-crontab` does not install cron entries — IT still required to add manually [CRITICAL]
+
+Actual:
+```console
+(venv) [itbomenf@server129 Shedule_bot]$ TZ=Europe/Kyiv python main.py --gen-crontab
+# Generated: 2026-05-03 16:51 (Europe/Kyiv)
+# ...
+# Paste all entries into cPanel → Cron Jobs.
+```
+
+The command prints cron entries but does not install them. IT must manually open cPanel → Cron Jobs and add each entry within a 5-minute window to catch the verification entry.
+
+Expected:
+The system installs the cron entries automatically — no manual cPanel interaction required. The `crontab` shell command is available on cPanel shared hosting and can be used to install entries programmatically.

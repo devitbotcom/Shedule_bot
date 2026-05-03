@@ -3,7 +3,7 @@
 **Sprint:** 004b  
 **Role:** Developer  
 **Date:** 2026-05-03  
-**Status:** ✅ COMPLETE — D1–D15 implemented; QA-005/008/009 fixed  
+**Status:** ✅ COMPLETE — D1–D16 implemented; QA-005/008/009/010 fixed; AD-S004b-013/014 implemented  
 **Arch ref:** `20260502_Sprint004b_ARCH_ShiftNotificationBot.md`
 
 ---
@@ -24,10 +24,11 @@
 | D10 | `main.py` — `[SCHEDULE]` line in `run_health()`      | ✅ | Calls `_shift_hours()`; non-blocking (AD-S004b-009) |
 | D11 | `main.py` — `[ENV TIME]` + `[TZ OFFSET]` lines       | ✅ | subprocess `unset TZ`; offset comparison; non-blocking (AD-S004b-010) |
 | D11b| `tests/test_health_extensions.py`                    | ✅ | 5 tests covering D10 and D11 |
-| D12 | `cli.py` + `main.py` — `--gen-crontab` command       | ✅ | Reads shift_hours + server offset; prints 5 cron entries (AD-S004b-011) |
-| D13 | `cli.py` + `main.py` — `--verify-cron` command       | ✅ | Sends Telegram confirmation; exits 0/1 (AD-S004b-012) |
-| D14 | DEPLOY.md P8 — replaced manual table with `--gen-crontab` | ✅ | QA-006/007 resolved |
-| D15 | `tests/test_gen_crontab.py`                          | ✅ | 11 tests; QA-008 open (hardcoded shift types) |
+| D12 | `cli.py` + `main.py` — `--gen-crontab` command       | ✅ | Installs via `crontab`; `# shedule_bot` marker; idempotent; fallback to print (AD-S004b-011/013) |
+| D13 | `cli.py` + `main.py` — `--verify-cron` command       | ✅ | Sends Telegram confirmation; self-removes from crontab; exits 0/1 (AD-S004b-012/014) |
+| D14 | DEPLOY.md P8/P9b — auto-install; no cPanel UI needed | ✅ | UAT 004b-7 resolved |
+| D15 | `tests/test_gen_crontab.py`                          | ✅ | 16 tests (was 11); QA-010 closed |
+| D16 | `tests/test_gen_crontab.py` — crontab install tests  | ✅ | install, idempotency, fallback, self-remove (AD-S004b-013/014) |
 
 ---
 
@@ -46,8 +47,8 @@
 - Added `[SCHEDULE]` block in `run_health()`: calls `_shift_hours(config)`, prints labor/holiday/other times; non-blocking
 - Added `[ENV TIME]` + `[TZ OFFSET]` block in `run_health()`: subprocess `unset TZ; date; date +%z; date +%Z`; offset comparison; both lines printed after all calculations; non-blocking
 - Added `_shift_time_to_server(kyiv_hhmm, bot_offset_h, server_offset_h) -> tuple` — pure conversion function
-- Added `run_gen_crontab(config)` — reads shift_hours + server offset via subprocess; prints 5 ready-to-paste cron entries including ~5-min verification entry; non-blocking on offset failure
-- Added `run_verify_cron(config)` — sends `✅ Cron active` to `TELEGRAM_GROUP_CHAT_ID`; exits 0/1
+- Added `run_gen_crontab(config)` — reads shift_hours + server offset; builds entries with `# shedule_bot` marker; installs via `crontab -l` / `crontab -` (idempotent: removes old shedule_bot lines first); falls back to printing if install fails; non-blocking on offset failure
+- Added `run_verify_cron(config)` — sends `✅ Cron active` to `TELEGRAM_GROUP_CHAT_ID`; self-removes `--verify-cron` entry from crontab after send; exits 0/1
 - Added dispatch branches in `main()` for `gen_crontab` and `verify_cron` modes
 
 ### `cli.py`
@@ -71,10 +72,10 @@
 
 ### `tests/test_gen_crontab.py` (replaced — was Docker gen_crontab.py tests)
 
-11 tests:
-- 4 pure unit tests for `_shift_time_to_server`: labor/holiday/other conversions, midnight-crossing, same-timezone
-- 5 tests for `run_gen_crontab`: all shift types present, verify entry present, install path correct, placeholder on offset failure, log retention present
-- 2 tests for `run_verify_cron`: sends to correct chat_id, exits 1 on failure
+16 tests (was 11):
+- 4 pure unit tests for `_shift_time_to_server`
+- 9 tests for `run_gen_crontab`: existing 5 updated to check `_CrontabCapture.installed` (not stdout); 4 new: installs via crontab, idempotent, fallback prints on crontab failure, custom shift type included (closes QA-010)
+- 3 tests for `run_verify_cron`: existing 2 updated; 1 new self-remove test
 
 ### `README.md`
 
@@ -100,7 +101,7 @@
 ## Test Results
 
 ```
-87 passed in 0.38s
+92 passed in 0.45s
 ```
 
 All pre-existing tests continue to pass. No regressions.
@@ -114,3 +115,5 @@ All pre-existing tests continue to pass. No regressions.
 | QA-008 | `run_gen_crontab` hardcoded shift types | Changed `for st in ("labor", "holiday", "other")` → `for st in hours.keys()` |
 | QA-009 | DEPLOY.md P9b DST section had old manual formula | Replaced with `--health` + `--gen-crontab` workflow |
 | QA-005 | DEPLOY.md P6b ambiguous about when messages are sent | Clarified: messages sent only if shifts exist today; DB created either way |
+| QA-010 | No test for custom shift type inclusion in gen_crontab | Added `test_gen_crontab_custom_shift_type_included` |
+| UAT-007 | `--gen-crontab` print-only, manual cPanel required | AD-S004b-013/014: auto-install via `crontab`; self-removing verify entry |

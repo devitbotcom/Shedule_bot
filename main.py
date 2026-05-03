@@ -320,47 +320,47 @@ def run_gen_crontab(config: dict) -> None:
         pass
 
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    if offset_ok:
-        diff_h = bot_offset_h - server_offset_h
-        bot_abbr = datetime.now().astimezone().strftime("%Z")
-        tz_header = (
-            f"Kyiv={bot_abbr} UTC{int(bot_offset_h):+d} | "
-            f"Server=UTC{int(server_offset_h):+d} | Offset={diff_h:.0f}h"
-        )
-    else:
-        tz_header = "⚠️ Could not read server offset — replace <HOUR> and <MIN> manually"
-
-    print(f"# Generated: {now_str} ({tz})")
-    print(f"# {tz_header}")
-    print(f"# Install: {install_root}")
-    print(f"# Paste all entries into cPanel → Cron Jobs.")
-    print(f"# Add the last entry too — remove it after the Telegram confirmation arrives.")
-    print()
 
     def _entry(shift_type):
         hhmm = hours.get(shift_type, "09:00")
         if offset_ok:
             sh, sm = _shift_time_to_server(hhmm, bot_offset_h, server_offset_h)
-            return f"{sm:2d} {sh:2d} * * *  TZ={tz} {python_bin} {main_script} --production --shift-type {shift_type}"
-        return f"<MIN> <HOUR> * * *  TZ={tz} {python_bin} {main_script} --production --shift-type {shift_type}  # Kyiv={hhmm}"
+            return f"{sm:2d} {sh:2d} * * *  TZ={tz} {python_bin} {main_script} --production --shift-type {shift_type}  # shedule_bot"
+        return f"<MIN> <HOUR> * * *  TZ={tz} {python_bin} {main_script} --production --shift-type {shift_type}  # Kyiv={hhmm}  # shedule_bot"
 
-    print("# Shift notifications")
-    for st in hours.keys():
-        print(_entry(st))
-    print()
+    entries = [_entry(st) for st in hours.keys()]
+    entries.append(f" 0  3 * * 0  find {config['LOG_DIR']} -name \"*.log\" -mtime +30 -delete  # shedule_bot")
 
-    print("# Log retention (weekly, Sunday)")
-    print(f" 0  3 * * 0  find {config['LOG_DIR']} -name \"*.log\" -mtime +30 -delete")
-    print()
-
-    print("# Verification — REMOVE AFTER FIRST FIRE")
     if offset_ok:
         now_h, now_m = int(server_now_hhmm[:2]), int(server_now_hhmm[2:])
         verify_total = (now_h * 60 + now_m + 5) % (24 * 60)
         vh, vm = verify_total // 60, verify_total % 60
-        print(f"{vm:2d} {vh:2d} * * *  TZ={tz} {python_bin} {main_script} --verify-cron")
+        entries.append(f"{vm:2d} {vh:2d} * * *  TZ={tz} {python_bin} {main_script} --verify-cron  # shedule_bot")
     else:
-        print(f"<MIN> <HOUR> * * *  TZ={tz} {python_bin} {main_script} --verify-cron")
+        entries.append(f"<MIN> <HOUR> * * *  TZ={tz} {python_bin} {main_script} --verify-cron  # shedule_bot")
+
+    installed = False
+    try:
+        existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+        kept = [line for line in existing.stdout.splitlines() if "# shedule_bot" not in line]
+        new_crontab = "\n".join(kept + entries) + "\n"
+        subprocess.run(["crontab", "-"], input=new_crontab, text=True, check=True, timeout=5)
+        installed = True
+    except Exception as exc:
+        logging.warning("Could not install crontab: %s", exc)
+
+    if installed:
+        print(f"[CRONTAB] ✅ {len(entries)} entries installed ({now_str})")
+        print(f"[CRONTAB] Verification entry fires in ~5 min — watch for Telegram confirmation.")
+        print(f"[CRONTAB] Re-run --gen-crontab any time to update (old entries replaced).")
+    else:
+        if not offset_ok:
+            print(f"[CRONTAB] ⚠️ Could not read server offset — replace <HOUR> and <MIN> manually")
+        else:
+            print(f"[CRONTAB] ⚠️ Auto-install failed — paste entries manually into cPanel → Cron Jobs:")
+        print()
+        for e in entries:
+            print(e)
 
     sys.exit(0)
 
@@ -373,10 +373,19 @@ def run_verify_cron(config: dict) -> None:
     try:
         adapter.send(config["TELEGRAM_GROUP_CHAT_ID"], message)
         print("[VERIFY] ✅ Confirmation sent to Telegram group")
-        sys.exit(0)
     except Exception as exc:
         logging.error("Verification send failed: %s", exc)
         sys.exit(1)
+
+    try:
+        existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+        kept = [line for line in existing.stdout.splitlines() if "--verify-cron" not in line]
+        subprocess.run(["crontab", "-"], input="\n".join(kept) + "\n", text=True, check=True, timeout=5)
+        logging.info("Verification cron entry removed")
+    except Exception as exc:
+        logging.warning("Could not remove verification cron entry: %s", exc)
+
+    sys.exit(0)
 
 
 def main() -> None:

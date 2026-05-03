@@ -3,7 +3,7 @@
 **Sprint:** 004b  
 **Role:** Architect  
 **Date:** 2026-05-02  
-**Status:** ⚠️ REVISED — post-UAT corrections applied 2026-05-03; AD-S004b-011/012 added 2026-05-03 (Owner requirement: system-generated cron + verification)  
+**Status:** ⚠️ REVISED — post-UAT corrections applied 2026-05-03; AD-S004b-013/014 added 2026-05-03 (UAT 004b-7: crontab must be installed, not printed)  
 **Scope:** Production deploy to Namecheap cPanel shared hosting. Minimal code change: one new check in `main.py` (clock drift monitor).  
 **Depends on:** S004 ✅ DONE  
 **Blocks:** S005 (dedup key + --shift-type scoping)
@@ -12,7 +12,7 @@
 
 ## Sprint Goal
 
-The bot runs automatically in production on Namecheap cPanel shared hosting. IT deploys once via `git clone`, runs `--gen-crontab` to get ready-to-paste cPanel entries, and receives a Telegram confirmation within 5 minutes of setup. Shift notifications then fire at the correct local times without any manual trigger or time calculation.
+The bot runs automatically in production on Namecheap cPanel shared hosting. IT deploys once via `git clone`, runs `--gen-crontab` to install cron entries automatically, and receives a Telegram confirmation within 5 minutes — no manual cPanel interaction required. Shift notifications then fire at the correct local times without any manual trigger or time calculation.
 
 ---
 
@@ -278,8 +278,8 @@ server_min  = server_total_minutes % 60
 
 **Contract:**
 - No DB access — does not call `init_db()`
-- Non-blocking on offset read failure: print warning, substitute `<server_hour>` and `<server_min>` placeholders so IT can fill in manually
-- Does not write to cPanel — output only (shared hosting has no reliable crontab API)
+- Non-blocking on offset read failure: print warning, substitute `<server_hour>` and `<server_min>` placeholders
+- ~~Does not write to cPanel — output only~~ **Superseded by AD-S004b-013:** installs via `crontab` command
 - No new dependencies (stdlib subprocess, existing `_shift_hours`)
 
 ---
@@ -300,7 +300,46 @@ Verified: 2026-05-03 10:05 (Europe/Kyiv)
 - Sends to `TELEGRAM_GROUP_CHAT_ID` (same as production)
 - No DB access
 - Exits 0 on success, 1 on send failure (logs error)
-- IT removes this cron entry from cPanel after first successful fire — clearly labeled in `--gen-crontab` output
+- ~~IT removes this cron entry from cPanel~~ **Superseded by AD-S004b-014:** self-removes from crontab after firing
+
+---
+
+### AD-S004b-013 — `--gen-crontab` installs via `crontab` command (supersedes print-only constraint in AD-S004b-011)
+
+**Problem:** AD-S004b-011 designed `--gen-crontab` as print-only based on the assumption that shared hosting has no reliable crontab API. This was wrong — the standard `crontab` shell command is available in the cPanel terminal. UAT finding 004b-7 confirmed the Owner expected zero manual cPanel interaction.
+
+**Decision:** `--gen-crontab` installs cron entries directly via `crontab -l` / `crontab -`. No cPanel UI interaction required.
+
+**Mechanism:**
+1. Build the 5 cron entry strings (same as AD-S004b-011)
+2. Read existing crontab: `crontab -l 2>/dev/null` (handle empty crontab without error)
+3. Strip all lines containing `# shedule_bot` marker (bot-managed entries from a previous run)
+4. Append new entries, each suffixed with `  # shedule_bot`
+5. Write back: pipe to `crontab -`
+6. Print confirmation of what was installed
+
+**Marker:** `# shedule_bot` (trailing comment on each bot-managed line). Enables idempotent re-runs — safe to call whenever `shift_hours` or timezone changes.
+
+**Fallback:** if `crontab` subprocess fails, print entries to stdout with a warning instructing IT to add manually.
+
+**No new dependencies:** stdlib subprocess only.
+
+---
+
+### AD-S004b-014 — `--verify-cron` self-removes from crontab after firing (supersedes manual removal in AD-S004b-012)
+
+**Problem:** AD-S004b-012 required IT to manually remove the verification entry from cPanel after the Telegram confirmation arrived. This is manual work — inconsistent with the zero-manual-interaction goal.
+
+**Decision:** After sending the Telegram confirmation message, `--verify-cron` removes the verification entry from the system crontab automatically.
+
+**Mechanism:**
+1. Send Telegram message (existing behaviour)
+2. Read crontab: `crontab -l 2>/dev/null`
+3. Filter out all lines containing `--verify-cron`
+4. Write back: pipe to `crontab -`
+5. Log removal; exit 0
+
+**Failure handling:** if crontab removal fails, log a warning and exit 0 — the Telegram send succeeded, the cleanup failure is non-critical. IT can remove the entry manually if it fires again.
 
 ---
 
@@ -319,10 +358,10 @@ Verified: 2026-05-03 10:05 (Europe/Kyiv)
 | D9  | README — Production cron management subsection  | How to update cPanel cron when `shift_hours` changes; how to run manually if missed; DST reminder — UAT finding 004b-3                         |
 | D10 | `main.py` — `[SCHEDULE]` line in `run_health()` | Call existing `_shift_hours(config)`; print after `[TIMEZONE]`; non-blocking on error (AD-S004b-009)                                          |
 | D11 | `main.py` — `[ENV TIME]` + `[TZ OFFSET]` lines  | subprocess `unset TZ && date`; offset from UTC offsets comparison; non-blocking on error (AD-S004b-010)                                        |
-| D12 | `cli.py` + `main.py` — `--gen-crontab` command  | Reads `shift_hours` + server offset; prints 5 cron entries (3 shift + 1 log retention + 1 verify); no DB; non-blocking on offset failure (AD-S004b-011) |
-| D13 | `cli.py` + `main.py` — `--verify-cron` command  | Sends one Telegram confirmation message; no DB; exits 1 on failure (AD-S004b-012)                                                             |
-| D14 | DEPLOY.md P8 — replace manual table with `--gen-crontab` | P8 becomes: run command, copy output into cPanel; QA-006 and QA-007 resolved                                                          |
-| D15 | Tests for `--gen-crontab` and `--verify-cron`    | Correct time calculation; offset failure fallback; verify message content                                                                      |
+| D12 | `cli.py` + `main.py` — `--gen-crontab` command  | Installs entries via `crontab`; `# shedule_bot` marker; idempotent; fallback to print on failure (AD-S004b-011/013) |
+| D13 | `cli.py` + `main.py` — `--verify-cron` command  | Sends Telegram confirmation; self-removes from crontab after firing; exits 0/1 (AD-S004b-012/014)                  |
+| D14 | DEPLOY.md P8 — `--gen-crontab` installs automatically | P8: run command, entries installed, wait for Telegram confirmation; no cPanel UI interaction                   |
+| D15 | Tests for `--gen-crontab` and `--verify-cron`    | Crontab install/idempotency/fallback; self-removal; verify message content                                          |
 
 ---
 
@@ -334,8 +373,8 @@ Verified: 2026-05-03 10:05 (Europe/Kyiv)
 | U02 | `python main.py --health`              | All lines ✅; `[TIMEZONE]` shows Europe/Kyiv; `[SCHEDULE]` shows shift_hours; `[ENV TIME]` shows server local time; `[TZ OFFSET]` shows correct offset                                          |
 | U03 | `python main.py --dry-run`             | Correct shifts listed for today                                                                                                                                                                 |
 | U04 | `python main.py --production`          | Notification arrives in Telegram group                                                                                                                                                          |
-| U05 | `python main.py --gen-crontab` output is correct | 5 entries printed with times derived from current `shift_hours` and server offset; no `<placeholder>` in paths |
-| U05b | Verification cron entry fires          | Add the `--verify-cron` entry from `--gen-crontab` output to cPanel; within 5 minutes receive `✅ Cron active` message in Telegram group; then remove the entry |
+| U05 | `TZ=Europe/Kyiv python main.py --gen-crontab` installs entries | Cron entries installed automatically; `crontab -l` shows 5 new entries marked `# shedule_bot`; no cPanel UI interaction needed |
+| U05b | Verification fires and self-removes    | Within 5 minutes receive `✅ Cron active` message in Telegram group; then `crontab -l` confirms `--verify-cron` entry is gone |
 | U06 | Local Docker workflow                  | Still works unchanged — production deploy does not affect local setup                                                                                                                           |
 | U07 | `python main.py --production` log      | `Clock drift OK` line present; no WARNING in normal conditions                                                                                                                                  |
 | U08 | cPanel cron log shows correct timezone | Check log file written by the cron-fired run — `[TIMEZONE]` line must show `Europe/Kyiv`, not `UTC`. Confirms `TZ=` prefix is honoured by cPanel cron.                                          |
@@ -352,6 +391,7 @@ Verified: 2026-05-03 10:05 (Europe/Kyiv)
 | 004b-2 | Extend health with env time and offset | 🔧 Fix in S004b — D11 | Required for IT to verify cron offset — core to S004b production operability |
 | 004b-3 | README missing production cron management | 🔧 Fix in S004b — D9 | Gap in D1 deliverable; IT cannot operate production without this |
 | 004b-4 | README cron table uses wrong server timezone | 🔧 Fix in S004b — D2 | Bug in D2 deliverable; cron entries calculated from wrong timezone will fire at wrong times |
+| 004b-7 | `--gen-crontab` prints but does not install — IT still required to add manually | 🔧 Fix in S004b — D12/D13 | AD-S004b-011 print-only assumption was wrong; `crontab` command available; Owner requirement is zero manual interaction (AD-S004b-013/014) |
 
 ---
 
