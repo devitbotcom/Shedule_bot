@@ -10,9 +10,11 @@ actor "IT" as IT
 participant "Бот розсилка" as Bot
 participant "Месенжер" as Messenger
 
+Head <-> Messenger : створє чернетку розкладу (POC2)
 CMO <-> Head : Складають розклад
 Head -> IT : надає затверджений \nрозклад
 Head -> IT : надає список \nконтактів** (POC2)
+IT -> Bot : Вносить дані (POC)
 IT -> Messenger : Створює групу, \nдодає бота (POC)
 CMO -> Source : Публікує розклад
 

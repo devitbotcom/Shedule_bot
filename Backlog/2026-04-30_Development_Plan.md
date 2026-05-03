@@ -77,21 +77,24 @@ Owner runs `python main.py --production` on the server and:
 
 ## Roadmap
 
-| Phase     | Scope                                                                                   | Status                                             |
-|-----------|-----------------------------------------------------------------------------------------|----------------------------------------------------|
-| S001      | Architecture                                                                            | ✅ Done                                             |
-| S002      | Foundation: config, CLI, DB, XLSX parser, shift logic + Docker local dev env            | ✅ Done — Owner UAT accepted 2026-04-30             |
-| S003      | Telegram adapter + orchestrator — group chat, plain text (POC)                          | ✅ Done — Owner UAT accepted 2026-04-30             |
-| S004      | Local automation: Docker cron service (supercronic), dynamic crontab from shift_hours   | ⏳ In progress — UAT paused on NFR-S004-001 (TZ)   |
-| S004b     | Production deploy: Namecheap cPanel, venv, hardening                                    | ⏸ Blocked on Owner OQ-1/2/3                        |
-| S005 `*`  | POC2 — group chat + @mention per doctor (needs username contact list)                   | ⏸ Post-POC                                         |
-| S006 `**` | Personal DMs — individual chat_id per doctor                                            | ⏸ Post-POC                                         |
-| S007 `**` | Viber messenger adapter                                                                  | ⏸ Post-POC                                         |
-| S008 `*`  | Multi-ward v2                                                                           | ⏸ Future                                           |
+| Phase    | Scope                                                                                 | Status                                                                        |
+|----------|---------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|
+| S001     | Architecture                                                                          | ✅ Done                                                                        |
+| S002     | Foundation: config, CLI, DB, XLSX parser, shift logic + Docker local dev env          | ✅ Done — Owner UAT accepted 2026-04-30                                        |
+| S003     | Telegram adapter + orchestrator — group chat, plain text (POC)                        | ✅ Done — Owner UAT accepted 2026-04-30                                        |
+| S004     | Local automation: Docker cron service (supercronic), dynamic crontab from shift_hours | ✅ Done — NFR-S004-001 resolved; UAT accepted                                  |
+| S004b    | Production deploy: Namecheap cPanel, venv, hardening                                  | ⏳ Owner UAT in progress — crontab auto-install confirmed on server 2026-05-03 |
+| S011 `*` | POC2 - USER registers himself to group chat (Permisison for IT, Head, Doctor)         | ⏸ POC2                                                                        |
+| S012 `*` | POC2 - Head requests to generate schedule (dialogue to provide time preferences)      | ⏸ POC2                                                                        |
+| S012 `*` | POC2 - Head asks for his department schedule                                          | ⏸ POC2                                                                        |
+| S?? `*`  | POC2 — group chat + @mention per doctor (needs username contact list)                 | ⏸ Post-POC                                                                    |
+| S?? `**` | Personal DMs — individual chat_id per doctor                                          | ⏸ Post-POC                                                                    |
+| S?? `**` | Viber messenger adapter                                                               | ⏸ Post-POC                                                                    |
+| S?? `*`  | Multi-ward v2                                                                         | ⏸ Future                                                                      |
 
 ---
 
-## Quality Characteristics — POC
+## Quality Characteristics — POC-1
 
 *Updated 2026-05-01 with primitives discovered during S003–S004.*
 
@@ -101,17 +104,17 @@ Owner runs `python main.py --production` on the server and:
 | Functional suitability | Completeness             | prev/next colleague resolved across date boundaries — full month context required.                  | BUG-005 (S003)            | ✅ S003         |
 | Reliability            | Fault tolerance          | Graceful error on all known failure modes. Exit 0/1. No silent skips.                              | S001                      | ✅ S003         |
 | Reliability            | Recoverability           | Log written on every run including failures. SQLite audit trail per send attempt.                  | S001                      | ✅ S003         |
-| Reliability            | Schedule correctness     | Cron fires at the time the Maintainer expects — `TZ` must match Maintainer's local timezone.       | NFR-S004-001 (S004 UAT)   | ⏳ S004 D7–D9  |
+| Reliability            | Schedule correctness     | Cron fires at the time the Maintainer expects — `TZ` must match Maintainer's local timezone.       | NFR-S004-001 (S004 UAT)   | ✅ S004b — `TZ=` prefix in every cron entry; `time.tzset()` fix in `config.py`; `--gen-crontab` calculates server-local times automatically |
 | Performance efficiency | —                        | Not measured — small staff volume, no SLA required.                                                | —                         | NA             |
 | Usability              | Operability              | Health check, dry-run, production CLI modes produce human-readable output.                         | S001                      | ✅ S003         |
 | Usability              | Configurability          | IT edits only `data/schedule_mapping.json` for shift timing — no crontab syntax knowledge needed.  | 004-2 (S004 UAT)          | ✅ S004         |
 | Security               | Confidentiality          | No secrets in code or logs. `.env` not in Git. No PII in log output. Token never in exceptions.   | S001 + BUG-S004-001       | ✅ S004         |
 | Compatibility          | Interoperability         | Standard XLSX (openpyxl), Telegram REST API. Adapter pattern isolates messenger dependency.        | S001                      | ✅ S003         |
-| Maintainability        | Modifiability            | IT updates `.env` (group chat ID, timezone) without touching code.                                 | S001 + S004               | ⏳ S004 D8     |
+| Maintainability        | Modifiability            | IT updates `.env` (group chat ID, timezone) without touching code.                                 | S001 + S004               | ✅ S004b — `--gen-crontab` reinstalls cron on any `shift_hours` change; DEPLOY.md P9b covers procedure |
 | Maintainability        | Testability              | Unit tests cover all logic layers. No network calls in tests. Subprocess tests for scripts.        | S001 + QA S004            | ✅ S004         |
 | Maintainability        | Analysability            | SQLite audit log. Timestamped log file on every run. CLI health check per component.              | S001                      | ✅ S003         |
 | Maintainability        | Single source of truth   | `shift_hours` in `schedule_mapping.json` drives both message content and cron schedule.            | 004-2 (S004 UAT)          | ✅ S004         |
-| Portability            | Installability           | `docker compose up -d cron` is the only command IT needs for ongoing operation.                    | S004                      | ✅ S004         |
+| Portability            | Installability           | `docker compose up -d cron` is the only command IT needs for local dev. Production: `--gen-crontab` installs all cron entries automatically — no cPanel UI interaction. | S004 + S004b              | ✅ S004b        |
 | Portability            | Adaptability             | Messenger adapter pattern supports adding Viber (S007) without changes to orchestrator or parser.  | S001 + S004 ext           | ⏸ S007         |
 
 ---
@@ -122,10 +125,10 @@ Owner runs `python main.py --production` on the server and:
 
 ### Current state
 
-| Messenger | Adapter | Sprint | Status |
-|-----------|---------|--------|--------|
-| Telegram  | `messenger/telegram_adapter.py` | S003 | ✅ Live |
-| Viber     | `messenger/viber_adapter.py` | S007 | ⏸ Planned |
+| Messenger | Adapter                         | Sprint  | Status    |
+|-----------|---------------------------------|---------|-----------|
+| Telegram  | `messenger/telegram_adapter.py` | S003    | ✅ Live    |
+| Viber     | `messenger/viber_adapter.py`    | S007    | ⏸ Planned |
 
 ### Extension contract
 
@@ -146,14 +149,14 @@ class MessengerGateway:
 
 **Isolation requirement:** Each adapter catches its own network exceptions and re-raises a sanitized `RuntimeError`. The orchestrator (`run_production()`) must never receive a token-bearing exception string from any adapter.
 
-### Planned: S007 Viber adapter
+### Planned: S??? Viber adapter
 
-| Item | Notes |
-|------|-------|
-| `VIBER_BOT_TOKEN` env var | Added to `.env.example` |
-| `messenger/viber_adapter.py` | Implements `send()` and `health_check()` |
+| Item                          | Notes                                                                        |
+|-------------------------------|------------------------------------------------------------------------------|
+| `VIBER_BOT_TOKEN` env var     | Added to `.env.example`                                                      |
+| `messenger/viber_adapter.py`  | Implements `send()` and `health_check()`                                     |
 | `contacts.json` re-introduced | Per-person routing: `{"name": ..., "messenger": "viber", "contact_id": ...}` |
-| Dedup key unchanged | employee + date — messenger-agnostic |
+| Dedup key unchanged           | employee + date — messenger-agnostic                                         |
 
 ---
 
@@ -161,11 +164,11 @@ class MessengerGateway:
 
 Issues raised by Owner during UAT that have been resolved or deferred.
 
-| ID    | Sprint | Description | Resolution |
-|-------|--------|-------------|------------|
-| 004-1 | S004   | Logs for review — IT needs to find when feature was used | ✅ Two log locations: `data/logs/` file + `docker compose logs cron`. README to document both. |
-| 004-2 | S004   | Two scheduling configs: `crontab` + `schedule.xlsx` | ✅ Resolved: `shift_hours` in `schedule_mapping.json` now drives cron schedule via `gen_crontab.py`. Single source of truth. |
-| NFR-S004-001 | S004 | Cron time interpreted in UTC, not Maintainer's local timezone | ⏳ In progress: D7–D9 (TZ via `.env`) |
+| ID           | Sprint  | Description                                                   | Resolution                                                                                                                                                          |
+|--------------|---------|---------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 004-1        | S004    | Logs for review — IT needs to find when feature was used      | ✅ Two log locations: `data/logs/` file + `docker compose logs cron`. README to document both.                                                                       |
+| 004-2        | S004    | Two scheduling configs: `crontab` + `schedule.xlsx`           | ✅ Resolved: `shift_hours` in `schedule_mapping.json` now drives cron schedule via `gen_crontab.py`. Single source of truth.                                         |
+| NFR-S004-001 | S004b   | Cron time interpreted in UTC, not Maintainer's local timezone | ✅ Resolved S004b: `TZ=Europe/Kyiv` prefix on every cron entry; `time.tzset()` in `config.py`; `--gen-crontab` computes server-local times from offset automatically |
 
 **S003 scope is locked.** All blocking items resolved. See Discussion doc for full Q&A record.
 
