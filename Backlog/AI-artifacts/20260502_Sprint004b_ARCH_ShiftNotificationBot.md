@@ -3,7 +3,7 @@
 **Sprint:** 004b  
 **Role:** Architect  
 **Date:** 2026-05-02  
-**Status:** ⚠️ REVISED — post-UAT corrections applied 2026-05-03 (OQ-3 wrong, AD-S004b-001 table corrected)  
+**Status:** ⚠️ REVISED — post-UAT corrections applied 2026-05-03; AD-S004b-011/012 added 2026-05-03 (Owner requirement: system-generated cron + verification)  
 **Scope:** Production deploy to Namecheap cPanel shared hosting. Minimal code change: one new check in `main.py` (clock drift monitor).  
 **Depends on:** S004 ✅ DONE  
 **Blocks:** S005 (dedup key + --shift-type scoping)
@@ -12,23 +12,25 @@
 
 ## Sprint Goal
 
-The bot runs automatically in production on Namecheap cPanel shared hosting. IT deploys once via `git clone`, configures three cPanel cron entries, and shift notifications fire at the correct local times without any manual trigger.
+The bot runs automatically in production on Namecheap cPanel shared hosting. IT deploys once via `git clone`, runs `--gen-crontab` to get ready-to-paste cPanel entries, and receives a Telegram confirmation within 5 minutes of setup. Shift notifications then fire at the correct local times without any manual trigger or time calculation.
 
 ---
 
 ## Scope Boundaries
 
-| In scope                                   | Out of scope                                               |
-|--------------------------------------------|------------------------------------------------------------|
-| git-based deploy to cPanel                 | Docker (not available on shared hosting)                   |
-| `venv` setup on server                     | `gen_crontab.py` (Docker-only)                             |
-| 3 cPanel cron entries (one per shift type) | Viber adapter (S007)                                       |
-| README — Production Install section        | S005 features (scoped --reload-schedule, dedup key change) |
-| Security hardening (`chmod`)               | CI/CD pipeline                                             |
-| Log retention cron                         | Any messenger or business logic changes                    |
-| Clock drift monitor (AD-S004b-008)         | Viber adapter (S007)                                       |
+| In scope                                        | Out of scope                                               |
+|-------------------------------------------------|------------------------------------------------------------|
+| git-based deploy to cPanel                      | Docker (not available on shared hosting)                   |
+| `venv` setup on server                          | `gen_crontab.py` (Docker-only)                             |
+| 3 cPanel cron entries (one per shift type)      | Viber adapter (S007)                                       |
+| README — Production Install section             | S005 features (scoped --reload-schedule, dedup key change) |
+| Security hardening (`chmod`)                    | CI/CD pipeline                                             |
+| Log retention cron                              | Any messenger or business logic changes                    |
+| Clock drift monitor (AD-S004b-008)              |                                                            |
+| `--gen-crontab` command (AD-S004b-011)          |                                                            |
+| `--verify-cron` command (AD-S004b-012)          |                                                            |
 
-**One Python change only:** `_check_clock_drift()` added to `main.py`. All other bot code unchanged. The bot already:
+**Python changes in this sprint:** `_check_clock_drift()`, `[SCHEDULE]`/`[ENV TIME]`/`[TZ OFFSET]` health lines, `--gen-crontab`, `--verify-cron`, `time.tzset()` fix in `config.py`. The bot already:
 - Supports `--shift-type` flag (implemented S004)
 - Uses `os.path.abspath` for all file operations
 - Loads `.env` via `python-dotenv`
@@ -99,12 +101,9 @@ This replaces every `docker compose run --rm bot python main.py <flags>` from th
 
 `gen_crontab.py` runs at Docker container startup and generates the crontab automatically. This mechanism is not available on shared hosting.
 
-**Decision:** IT configures 3 cron entries manually in the cPanel cron UI.
+**Decision:** The system generates ready-to-paste cPanel cron entries via `--gen-crontab` (AD-S004b-011). IT copies the output into the cPanel UI — no manual time calculation required.
 
-**Single source of truth gap:** When `shift_hours` in `schedule_mapping.json` is updated, IT must also update the 3 cPanel cron times manually (applying the server-local time offset — see AD-S004b-001 formula). This is a documented two-step — not a bug.
-
-**README must make this explicit:**
-> Whenever you change `shift_hours`, recalculate the server-local cron times using the offset formula in the cron table, and update all 3 cPanel cron entries.
+> ⚠️ **Superseded (2026-05-03):** Original decision was "IT configures entries manually." This was not an Owner requirement — the PRL specifies the system acts. Manual calculation was an unexamined assumption. AD-S004b-011 replaces it.
 
 ---
 
@@ -237,6 +236,74 @@ Print two lines after `[SCHEDULE]`:
 
 ---
 
+### AD-S004b-011 — `--gen-crontab` command (system-generated cron entries)
+
+**Problem:** IT manually calculates server-local cron times from `shift_hours` and the TZ offset — error-prone and undocumented if the formula is forgotten. The system already holds all required inputs: `shift_hours` (from `schedule_mapping.json`) and server UTC offset (already computed in `run_health()`).
+
+**Decision:** New CLI mode `--gen-crontab`. Prints five ready-to-paste cPanel cron entry strings — no manual calculation.
+
+**Inputs the command reads:**
+- `shift_hours` via `_shift_hours(config)` (existing function)
+- Server native UTC offset via `subprocess.run(['bash', '-c', 'unset TZ; date +%z'], ...)` (same pattern as AD-S004b-010)
+- Absolute install path — extracted from `XLSX_PATH` in `.env`: `/home/<username>/Shedule_bot/...` → prefix is `/home/<username>/Shedule_bot`
+- Current server time (for verification entry) via `subprocess.run(['bash', '-c', 'unset TZ; date +%H%M'], ...)`
+
+**Output format** (example — values derived from config):
+```
+# Generated: 2026-05-03 Kyiv=10:00 | Server=EDT UTC-4 | Offset=7h
+# Paste all entries into cPanel → Cron Jobs
+
+# Shift notifications
+0  10 * * *  TZ=Europe/Kyiv /home/itbomenf/Shedule_bot/venv/bin/python /home/itbomenf/Shedule_bot/main.py --production --shift-type labor
+0   2 * * *  TZ=Europe/Kyiv /home/itbomenf/Shedule_bot/venv/bin/python /home/itbomenf/Shedule_bot/main.py --production --shift-type holiday
+0   2 * * *  TZ=Europe/Kyiv /home/itbomenf/Shedule_bot/venv/bin/python /home/itbomenf/Shedule_bot/main.py --production --shift-type other
+
+# Log retention (weekly, Sunday)
+0   3 * * 0  find /home/itbomenf/Shedule_bot/data/logs -name "*.log" -mtime +30 -delete
+
+# Verification — REMOVE AFTER FIRST FIRE
+# Fires in ~5 min. You will receive a Telegram confirmation message.
+5  10 * * *  TZ=Europe/Kyiv /home/itbomenf/Shedule_bot/venv/bin/python /home/itbomenf/Shedule_bot/main.py --verify-cron
+```
+
+**Cron time calculation:**
+```
+server_total_minutes = kyiv_hour * 60 + kyiv_minute − offset_minutes
+if server_total_minutes < 0: server_total_minutes += 24 * 60
+server_hour = server_total_minutes // 60
+server_min  = server_total_minutes % 60
+```
+
+**Verification entry timing:** `current_server_time + 5 minutes` (handle overflow across hour/midnight).
+
+**Contract:**
+- No DB access — does not call `init_db()`
+- Non-blocking on offset read failure: print warning, substitute `<server_hour>` and `<server_min>` placeholders so IT can fill in manually
+- Does not write to cPanel — output only (shared hosting has no reliable crontab API)
+- No new dependencies (stdlib subprocess, existing `_shift_hours`)
+
+---
+
+### AD-S004b-012 — `--verify-cron` command (cron setup confirmation)
+
+**Problem:** After IT adds cron entries to cPanel, there is no feedback that the entries are firing correctly. IT must wait until the next scheduled shift time — which may be hours away.
+
+**Decision:** New CLI mode `--verify-cron`. Sends one Telegram message to the group and exits. IT adds the verification cron entry (generated by `--gen-crontab` in AD-S004b-011) alongside the 4 permanent entries. It fires ~5 minutes after setup. Seeing the message confirms: cron fires, TZ prefix works, Telegram connection is live.
+
+**Message format:**
+```
+✅ Cron active — schedule configured
+Verified: 2026-05-03 10:05 (Europe/Kyiv)
+```
+
+**Contract:**
+- Sends to `TELEGRAM_GROUP_CHAT_ID` (same as production)
+- No DB access
+- Exits 0 on success, 1 on send failure (logs error)
+- IT removes this cron entry from cPanel after first successful fire — clearly labeled in `--gen-crontab` output
+
+---
+
 ## Developer Deliverables
 
 | #  | Deliverable                                     | Notes                                                                                                                                          |
@@ -252,6 +319,10 @@ Print two lines after `[SCHEDULE]`:
 | D9  | README — Production cron management subsection  | How to update cPanel cron when `shift_hours` changes; how to run manually if missed; DST reminder — UAT finding 004b-3                         |
 | D10 | `main.py` — `[SCHEDULE]` line in `run_health()` | Call existing `_shift_hours(config)`; print after `[TIMEZONE]`; non-blocking on error (AD-S004b-009)                                          |
 | D11 | `main.py` — `[ENV TIME]` + `[TZ OFFSET]` lines  | subprocess `unset TZ && date`; offset from UTC offsets comparison; non-blocking on error (AD-S004b-010)                                        |
+| D12 | `cli.py` + `main.py` — `--gen-crontab` command  | Reads `shift_hours` + server offset; prints 5 cron entries (3 shift + 1 log retention + 1 verify); no DB; non-blocking on offset failure (AD-S004b-011) |
+| D13 | `cli.py` + `main.py` — `--verify-cron` command  | Sends one Telegram confirmation message; no DB; exits 1 on failure (AD-S004b-012)                                                             |
+| D14 | DEPLOY.md P8 — replace manual table with `--gen-crontab` | P8 becomes: run command, copy output into cPanel; QA-006 and QA-007 resolved                                                          |
+| D15 | Tests for `--gen-crontab` and `--verify-cron`    | Correct time calculation; offset failure fallback; verify message content                                                                      |
 
 ---
 
@@ -263,7 +334,8 @@ Print two lines after `[SCHEDULE]`:
 | U02 | `python main.py --health`              | All lines ✅; `[TIMEZONE]` shows Europe/Kyiv; `[SCHEDULE]` shows shift_hours; `[ENV TIME]` shows server local time; `[TZ OFFSET]` shows correct offset                                          |
 | U03 | `python main.py --dry-run`             | Correct shifts listed for today                                                                                                                                                                 |
 | U04 | `python main.py --production`          | Notification arrives in Telegram group                                                                                                                                                          |
-| U05 | cPanel cron fires at scheduled time    | Notification arrives automatically, log written. **Test shortcut:** temporarily set the cron entry to `* * * * *`, wait one minute, verify notification and log, then restore the correct time. |
+| U05 | `python main.py --gen-crontab` output is correct | 5 entries printed with times derived from current `shift_hours` and server offset; no `<placeholder>` in paths |
+| U05b | Verification cron entry fires          | Add the `--verify-cron` entry from `--gen-crontab` output to cPanel; within 5 minutes receive `✅ Cron active` message in Telegram group; then remove the entry |
 | U06 | Local Docker workflow                  | Still works unchanged — production deploy does not affect local setup                                                                                                                           |
 | U07 | `python main.py --production` log      | `Clock drift OK` line present; no WARNING in normal conditions                                                                                                                                  |
 | U08 | cPanel cron log shows correct timezone | Check log file written by the cron-fired run — `[TIMEZONE]` line must show `Europe/Kyiv`, not `UTC`. Confirms `TZ=` prefix is honoured by cPanel cron.                                          |
@@ -299,7 +371,7 @@ None. All OQs resolved:
 
 | Role      | Name | Date       | Status                                                                |
 |-----------|------|------------|-----------------------------------------------------------------------|
-| Architect | AI   | 2026-05-03 | ✅ REVISED — AD-S004b-009/010 added; D10/D11 added; ready for Developer |
+| Architect | AI   | 2026-05-03 | ✅ REVISED — AD-S004b-009/010/011/012 added; D10–D15 added; ready for Developer |
 | Developer | AI   | 2026-05-03 | ✅ D1–D9 COMPLETE — D10/D11 pending                                     |
 | QA        | AI   | 2026-05-02 | ✅ SIGNED OFF — QA-001/002/003 deferred to UAT                         |
 | Owner     |      | 2026-05-03 | ⏸ IN PROGRESS — see `20260503_Sprint004b_UAT_ShiftNotificationBot.md` |
