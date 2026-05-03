@@ -126,3 +126,25 @@ Root cause: `.gitignore` covered `.venv/` but not `venv/` — the convention use
 Fix: `venv/` added to `.gitignore` (2026-05-03).
 
 Quality primitive was updated? — Yes: rule added to `AI-assistance/ext/backend-python.md` — `.gitignore` must cover all local runtime artifacts; QA must run `git status` on a clean checkout before release.
+
+
+### 004b-6 Wrong info about offset. [high]
+
+Actual:
+```console 
+(venv) [itbomenf@server129 Shedule_bot]$ cd ~/Shedule_bot && source venv/bin/activate && python main.py --health                   
+2026-05-03 03:05:53,449 [INFO] Starting shift_bot | mode=health                                                                                                                         
+[CONFIG]   ✅ all variables loaded                                                                                                                                                      
+[TIMEZONE] Europe/Kyiv — 2026-05-03 03:05:53 local                                                                                                                                      
+[SCHEDULE] shift_hours: labor=17:00  holiday=09:00  other=09:44                                                                                                                         
+[ENV TIME]  Sun May  3 03:05:53 EDT 2026                                                                                                                                                
+[TZ OFFSET] bot and server clocks match (Europe/Kyiv EDT UTC-4 vs server EDT UTC-4)   
+```
+and 
+```console 
+(venv) [itbomenf@server129 Shedule_bot]$ date
+Sun May  3 03:07:03 EDT 2026
+```
+
+Ecpected:
+meaningful info for maintainers to show

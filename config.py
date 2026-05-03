@@ -1,9 +1,12 @@
 import os
 import sys
+import time
 
 from dotenv import load_dotenv
 
 load_dotenv()
+if os.getenv("TZ") and hasattr(time, "tzset"):  # apply TZ from .env on Unix
+    time.tzset()
 
 REQUIRED_VARS = (
     "XLSX_PATH",
