@@ -59,7 +59,7 @@ Note: "Event diff -7" means the server clock (EDT, UTC-4) is 7 hours behind the 
 
 
 
-### 004b-3 README missing cron management instructions for production (non-Docker) [CRITICAL] — ⏸ OPEN
+### 004b-3 README missing cron management instructions for production (non-Docker) [CRITICAL] — ✅ ADDRESSED
 
 Actual:
 README.md section `### 10. Local automation (cron service)` describes how to restart the cron scheduler in the Docker workflow (`docker compose restart cron`). There is no equivalent section in `## For Production (cPanel)` explaining how IT should:
@@ -76,7 +76,7 @@ A dedicated subsection in the Production section of README that covers:
 
 
 
-### 004b-4 README cron conversion table uses wrong server timezone [CRITICAL] — ⏸ OPEN
+### 004b-4 README cron conversion table uses wrong server timezone [CRITICAL] — ✅ ADDRESSED
 
 Actual:
 README P8 cron conversion table (added in S004b) lists UTC times for the cPanel cron entries:

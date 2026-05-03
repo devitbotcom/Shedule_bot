@@ -3,7 +3,7 @@
 **Sprint:** 004b  
 **Role:** Developer  
 **Date:** 2026-05-03  
-**Status:** ✅ COMPLETE (D2 corrected + D9 added post-UAT 2026-05-03)  
+**Status:** ✅ COMPLETE — D1–D11 done  
 **Arch ref:** `20260502_Sprint004b_ARCH_ShiftNotificationBot.md`
 
 ---
@@ -20,7 +20,10 @@
 | D9 | README — Production cron management  | ✅ | P9b; update workflow, manual run, DST procedure (UAT finding 004b-3) |
 | D6 | `.env.example` — absolute paths      | ✅ | Production block added as commented section |
 | D7 | `main.py` — `_check_clock_drift()`   | ✅ | Called at top of `run_production()`; HTTPS endpoint |
-| D8 | `tests/test_clock_drift.py`          | ✅ | 4 tests; 77/77 suite passing |
+| D8  | `tests/test_clock_drift.py`                    | ✅ | 4 tests; 77/77 suite passing |
+| D10 | `main.py` — `[SCHEDULE]` line in `run_health()` | ✅ | Calls `_shift_hours()`; non-blocking on error (AD-S004b-009) |
+| D11 | `main.py` — `[ENV TIME]` + `[TZ OFFSET]` lines  | ✅ | subprocess `unset TZ`; offset comparison; non-blocking (AD-S004b-010) |
+| D12 | `tests/test_health_extensions.py`              | ✅ | 5 tests; 82/82 suite passing |
 
 ---
 
@@ -44,6 +47,21 @@ Four test cases:
 
 Added commented production block showing absolute-path alternatives for `XLSX_PATH`, `DB_PATH`, `LOG_DIR` with `<username>` placeholder.
 
+### `main.py` — post-UAT additions (2026-05-03)
+
+- Added `import subprocess` (stdlib, no new dependency)
+- `run_health()` — added `[SCHEDULE]` block: calls `_shift_hours(config)`, prints `labor/holiday/other` times; non-blocking on exception
+- `run_health()` — added `[ENV TIME]` + `[TZ OFFSET]` block: subprocess `unset TZ; date; date +%z; date +%Z` to get server-native time; offset computed from bot's `utcoffset()` vs server's `date +%z`; non-blocking on exception
+
+### `tests/test_health_extensions.py` (new)
+
+Five test cases:
+1. `test_schedule_line_shows_shift_hours` — `[SCHEDULE]` line appears with correct values
+2. `test_schedule_line_shows_error_when_mapping_unreadable` — `_shift_hours` raises → `[SCHEDULE] ❌` printed, no crash
+3. `test_env_time_and_offset_shown` — subprocess returns fake EDT output → `[ENV TIME]` and `[TZ OFFSET]` present
+4. `test_env_time_shows_error_when_subprocess_fails` — subprocess raises → `[ENV TIME] ❌` printed
+5. `test_env_time_error_does_not_raise` — subprocess raises → only `SystemExit` from `run_health`, no propagation
+
 ### `README.md`
 
 - Added `## For Production (cPanel — Namecheap)` section (P0–P12) *(original)*
@@ -57,7 +75,7 @@ Added commented production block showing absolute-path alternatives for `XLSX_PA
 ## Test Results
 
 ```
-77 passed in 0.71s
+82 passed in 0.49s
 ```
 
 All pre-existing tests continue to pass. No regressions.

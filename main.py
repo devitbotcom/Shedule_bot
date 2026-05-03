@@ -1,5 +1,6 @@
 import logging
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -85,6 +86,43 @@ def run_health(config: dict) -> None:
     tz = os.environ.get("TZ", "(not set — using host timezone)")
     local_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[TIMEZONE] {tz} — {local_now} local")
+
+    # Schedule config (D10)
+    try:
+        hours = _shift_hours(config)
+        hours_str = "  ".join(f"{k}={hours.get(k, '?')}" for k in ("labor", "holiday", "other"))
+        print(f"[SCHEDULE] shift_hours: {hours_str}")
+    except Exception:
+        print("[SCHEDULE] ❌ could not read schedule_mapping.json")
+
+    # Server local time and TZ offset (D11)
+    try:
+        result = subprocess.run(
+            ["bash", "-c", "unset TZ; date; date +%z; date +%Z"],
+            capture_output=True, text=True, timeout=3,
+        )
+        lines = result.stdout.strip().splitlines()
+        env_date, srv_offset_str, srv_abbr = lines[0], lines[1], lines[2]
+
+        sign = 1 if srv_offset_str[0] == "+" else -1
+        srv_offset_h = sign * (int(srv_offset_str[1:3]) + int(srv_offset_str[3:5]) / 60)
+        bot_offset_h = datetime.now().astimezone().utcoffset().total_seconds() / 3600
+        diff_h = bot_offset_h - srv_offset_h
+
+        bot_abbr = datetime.now().astimezone().strftime("%Z")
+        bot_utc = f"UTC{int(bot_offset_h):+d}"
+        srv_utc = f"UTC{srv_offset_h:+.0f}"
+        if diff_h > 0:
+            label = f"bot leads server by {diff_h:.0f}h"
+        elif diff_h < 0:
+            label = f"server leads bot by {abs(diff_h):.0f}h"
+        else:
+            label = "bot and server clocks match"
+
+        print(f"[ENV TIME]  {env_date}")
+        print(f"[TZ OFFSET] {label} ({tz} {bot_abbr} {bot_utc} vs server {srv_abbr} {srv_utc})")
+    except Exception:
+        print("[ENV TIME]  ❌ could not read server local time")
 
     # DB
     try:

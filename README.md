@@ -123,12 +123,15 @@ docker compose run --rm bot python main.py --production
 ```
 
 **Verify container time before go-live:**
+
 ```bash
 docker compose run --rm bot python main.py --health
 ```
+
 Check the `[TIMEZONE]` line — the timezone and local time shown must match your wall clock. If the timezone is wrong, update `TZ` in `.env` and restart. If the time itself is wrong, check your system clock and Docker daemon.
 
 **Stop the cron service:**
+
 ```bash
 docker compose stop cron
 ```
@@ -207,8 +210,10 @@ cd shift_bot
 
 ### P2. Create virtual environment
 
+The system `python3` on Namecheap shared hosting is 3.6 — too old. Use the hosted Python 3.11:
+
 ```bash
-python3 -m venv venv
+/opt/alt/python311/bin/python3.11 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -245,8 +250,7 @@ TZ=Europe/Kyiv
 ### P5. Verify setup
 
 ```bash
-source venv/bin/activate
-python main.py
+cd ~/shift_bot && source venv/bin/activate && python main.py --health
 ```
 
 All lines should show ✅. Check that `[TIMEZONE]` shows `Europe/Kyiv` and matches your wall clock.
@@ -254,7 +258,7 @@ All lines should show ✅. Check that `[TIMEZONE]` shows `Europe/Kyiv` and match
 ### P6. Preview before sending
 
 ```bash
-python main.py --dry-run
+cd ~/shift_bot && source venv/bin/activate && python main.py --dry-run
 ```
 
 ### P7. Security hardening

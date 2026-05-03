@@ -184,6 +184,59 @@ def _check_clock_drift() -> None:
 
 ---
 
+### AD-S004b-009 — Show active shift_hours in health output (004b-1)
+
+**Problem:** IT must open `schedule_mapping.json` to confirm which times the bot uses. A misconfigured `shift_hours` is invisible during health check.
+
+**Decision:** Call the existing `_shift_hours(config)` inside `run_health()` and print a `[SCHEDULE]` line immediately after `[TIMEZONE]`.
+
+**Output format:**
+```
+[SCHEDULE] shift_hours: labor=17:00  holiday=09:00  other=08:20
+```
+
+**Contract:**
+- Uses existing `_shift_hours()` — no new function, no new dependency
+- Non-blocking: if the call raises, print `[SCHEDULE] ❌ could not read schedule_mapping.json` and continue; do not set `all_ok = False` (schedule is not required for DB/Telegram health)
+- Key order: `labor`, `holiday`, `other` — fixed display order regardless of JSON key order
+
+---
+
+### AD-S004b-010 — Show server local time and TZ offset in health output (004b-2)
+
+**Problem:** With `TZ=Europe/Kyiv` active in the process, `datetime.now()` returns Kyiv time. IT cannot see the server's actual wall clock or verify the offset between bot TZ and server TZ — the two values needed to calculate cPanel cron times.
+
+**Decision:** Use `subprocess.run(['bash', '-c', 'unset TZ && date'], ...)` to read the server's local time outside the `TZ` env var override. Calculate the offset by comparing the bot's UTC offset (from `datetime.now().astimezone().utcoffset()`) to the server's UTC offset (from `unset TZ && date +%z`).
+
+Print two lines after `[SCHEDULE]`:
+```
+[ENV TIME]  Sun May  3 01:02:35 EDT 2026
+[TZ OFFSET] bot leads server by 7h (Europe/Kyiv EEST UTC+3 vs server EDT UTC-4)
+```
+
+**Why subprocess:** `TZ` env var is inherited by all Python APIs (`time`, `datetime`, `tzlocal`). The only way to read the server's native timezone from within the same process is to spawn a child shell and unset the variable there. `subprocess` is stdlib — no new dependency.
+
+**Contract:**
+- Non-blocking: if subprocess fails, print `[ENV TIME]  ❌ could not read server local time` and skip `[TZ OFFSET]`; do not set `all_ok = False`
+- Offset label: positive diff → "bot leads server by Xh"; negative → "server leads bot by Xh"; zero → "bot and server clocks match"
+- Timeout: 3 seconds on the subprocess call
+
+**Line order in health output:**
+```
+[CONFIG]
+[TIMEZONE]   ← bot configured TZ + Kyiv datetime
+[SCHEDULE]   ← shift_hours (AD-S004b-009)
+[ENV TIME]   ← server local datetime (AD-S004b-010)
+[TZ OFFSET]  ← derived offset (AD-S004b-010)
+[DB]
+[TELEGRAM]
+[XLSX]
+[LAST RUN]
+[PENDING]
+```
+
+---
+
 ## Developer Deliverables
 
 | #  | Deliverable                                     | Notes                                                                                                                                          |
@@ -196,7 +249,9 @@ def _check_clock_drift() -> None:
 | D6 | `.env.example` — add absolute path placeholders | `DB_PATH`, `LOG_DIR`, `DATA_DIR` with `<username>` placeholder and note                                                                        |
 | D7 | `main.py` — `_check_clock_drift()` function     | Called at start of `run_production()`; non-blocking; logs WARNING if delta > 5 min (AD-S004b-008)                                              |
 | D8 | Unit tests for `_check_clock_drift()`           | Positive: delta < 300s → INFO logged. Negative: delta > 300s → WARNING logged. Negative: API unreachable → WARNING logged, no exception raised |
-| D9 | README — Production cron management subsection  | How to update cPanel cron when `shift_hours` changes; how to run manually if missed; DST reminder — UAT finding 004b-3                         |
+| D9  | README — Production cron management subsection  | How to update cPanel cron when `shift_hours` changes; how to run manually if missed; DST reminder — UAT finding 004b-3                         |
+| D10 | `main.py` — `[SCHEDULE]` line in `run_health()` | Call existing `_shift_hours(config)`; print after `[TIMEZONE]`; non-blocking on error (AD-S004b-009)                                          |
+| D11 | `main.py` — `[ENV TIME]` + `[TZ OFFSET]` lines  | subprocess `unset TZ && date`; offset from UTC offsets comparison; non-blocking on error (AD-S004b-010)                                        |
 
 ---
 
@@ -205,7 +260,7 @@ def _check_clock_drift() -> None:
 | #   | Action                                 | Expected result                                                                                                                                                                                 |
 |-----|----------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | U01 | `git clone` + `pip install`            | No errors                                                                                                                                                                                       |
-| U02 | `python main.py` (health check)        | All lines ✅ including `[TIMEZONE]` showing Europe/Kyiv time                                                                                                                                     |
+| U02 | `python main.py --health`              | All lines ✅; `[TIMEZONE]` shows Europe/Kyiv; `[SCHEDULE]` shows shift_hours; `[ENV TIME]` shows server local time; `[TZ OFFSET]` shows correct offset                                          |
 | U03 | `python main.py --dry-run`             | Correct shifts listed for today                                                                                                                                                                 |
 | U04 | `python main.py --production`          | Notification arrives in Telegram group                                                                                                                                                          |
 | U05 | cPanel cron fires at scheduled time    | Notification arrives automatically, log written. **Test shortcut:** temporarily set the cron entry to `* * * * *`, wait one minute, verify notification and log, then restore the correct time. |
@@ -221,8 +276,8 @@ def _check_clock_drift() -> None:
 
 | Finding | Title | Decision | Rationale |
 |---------|-------|----------|-----------|
-| 004b-1 | Extend health with shift schedule | ⏩ Deferred to S005 | New feature; not in S004b scope |
-| 004b-2 | Extend health with env time and offset | ⏩ Deferred to S005 | New feature; not in S004b scope |
+| 004b-1 | Extend health with shift schedule | 🔧 Fix in S004b — D10 | IT needs this to verify bot config without opening files; direct extension of S004b goal |
+| 004b-2 | Extend health with env time and offset | 🔧 Fix in S004b — D11 | Required for IT to verify cron offset — core to S004b production operability |
 | 004b-3 | README missing production cron management | 🔧 Fix in S004b — D9 | Gap in D1 deliverable; IT cannot operate production without this |
 | 004b-4 | README cron table uses wrong server timezone | 🔧 Fix in S004b — D2 | Bug in D2 deliverable; cron entries calculated from wrong timezone will fire at wrong times |
 
@@ -244,7 +299,7 @@ None. All OQs resolved:
 
 | Role      | Name | Date       | Status                                                                |
 |-----------|------|------------|-----------------------------------------------------------------------|
-| Architect | AI   | 2026-05-03 | ✅ REVISED — OQ-3 corrected, AD-S004b-001 table corrected, D9 added; ready for Developer (D2+D9) |
-| Developer | AI   | 2026-05-03 | ✅ COMPLETE — D1–D9 done; D2 corrected + D9 added post-UAT             |
+| Architect | AI   | 2026-05-03 | ✅ REVISED — AD-S004b-009/010 added; D10/D11 added; ready for Developer |
+| Developer | AI   | 2026-05-03 | ✅ D1–D9 COMPLETE — D10/D11 pending                                     |
 | QA        | AI   | 2026-05-02 | ✅ SIGNED OFF — QA-001/002/003 deferred to UAT                         |
 | Owner     |      | 2026-05-03 | ⏸ IN PROGRESS — see `20260503_Sprint004b_UAT_ShiftNotificationBot.md` |
