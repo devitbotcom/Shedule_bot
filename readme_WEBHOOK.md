@@ -8,6 +8,18 @@ On cPanel shared hosting this runs as a CGI script — no persistent process req
 
 ---
 
+## Placeholders used in this guide
+
+Replace every placeholder before running a command. Placeholders use `<ALL_CAPS>` format.
+
+| Placeholder          | What to put                                             |
+|----------------------|---------------------------------------------------------|
+| `<YOUR_DOMAIN>`      | Your public domain, e.g. `itbomenf.server129.com`       |
+| `<YOUR_TELEGRAM_ID>` | Your numeric Telegram user ID (shown by `/start` reply) |
+| `<YOUR_BOT_TOKEN>`   | Your Telegram bot token from @BotFather                 |
+
+---
+
 ## Step 0 — Pull latest code
 
 In **cPanel → Advanced → Terminal**:
@@ -15,6 +27,14 @@ In **cPanel → Advanced → Terminal**:
 ```bash
 cd ~/Shedule_bot && git pull
 ```
+
+If this is your first time setting up the webhook, also run once:
+
+```bash
+git config --local core.fileMode false
+```
+
+This tells git to ignore file permission changes on this server. Without it, the `chmod` in Step 1 will show as a pending change on every future `git pull`.
 
 ---
 
@@ -26,6 +46,7 @@ chmod 755 ~/Shedule_bot/bot_hook.py
 ```
 
 > If you see `ln: failed to create symbolic link … File exists`, remove the old entry first:
+>
 > ```bash
 > rm ~/public_html/bot_hook.py
 > ln -s ~/Shedule_bot/bot_hook.py ~/public_html/bot_hook.py
@@ -34,8 +55,9 @@ chmod 755 ~/Shedule_bot/bot_hook.py
 Verify it is reachable:
 
 ```bash
-curl -s https://yourdomain.com/bot_hook.py
+curl -s https://<YOUR_DOMAIN>/bot_hook.py
 # Expected: {}   (printed on its own line — empty output means a script error)
+# curl -s https://digital-muzzle.com/Shedule_bot/bot_hook.py
 ```
 
 ---
@@ -48,10 +70,10 @@ Generate a secret token:
 python3 -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-Add these two lines to `~/Shedule_bot/.env`:
+Add these two lines to `~/Shedule_bot/.env` (e.g. using $ nano .env):
 
 ```
-WEBHOOK_URL=https://yourdomain.com/bot_hook.py
+WEBHOOK_URL=https://<YOUR_DOMAIN>/bot_hook.py
 WEBHOOK_SECRET_TOKEN=<token from above>
 ```
 
@@ -67,7 +89,7 @@ TZ=Europe/Kyiv python main.py --register-webhook
 Expected output:
 
 ```
-[WEBHOOK] ✅ Registered: https://yourdomain.com/bot_hook.py
+[WEBHOOK] ✅ Registered: https://<YOUR_DOMAIN>/bot_hook.py
 ```
 
 ---
@@ -78,13 +100,13 @@ Get your Telegram ID by messaging the bot `/start` (it appears in the reply).
 
 ```bash
 cd ~/Shedule_bot && source venv/bin/activate
-TZ=Europe/Kyiv python main.py --bootstrap-it <your_telegram_id>
+TZ=Europe/Kyiv python main.py --bootstrap-it <YOUR_TELEGRAM_ID>
 ```
 
 Expected output:
 
 ```
-[BOOTSTRAP] ✅ IT user <your_telegram_id> registered
+[BOOTSTRAP] ✅ IT user <YOUR_TELEGRAM_ID> registered
 ```
 
 ---
@@ -104,16 +126,16 @@ If your domain or path changes, re-run Step 3. `--register-webhook` is idempoten
 ## Removing the webhook
 
 ```bash
-curl -s "https://api.telegram.org/bot<TOKEN>/deleteWebhook"
+curl -s "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/deleteWebhook"
 ```
 
 ---
 
 ## Troubleshooting
 
-| Symptom | Check |
-|---|---|
-| Bot silent after message | `tail -20 ~/Shedule_bot/data/logs/webhook.log` |
-| `curl` returns HTML instead of `{}` | Symlink broken or `bot_hook.py` not executable |
-| 403 from bot_hook | `WEBHOOK_SECRET_TOKEN` mismatch — fix `.env`, re-run Step 3 |
-| Role stays `pending` | Run Step 4 (`--bootstrap-it`) first |
+| Symptom                             | Check                                                       |
+|-------------------------------------|-------------------------------------------------------------|
+| Bot silent after message            | `tail -20 ~/Shedule_bot/data/logs/webhook.log`              |
+| `curl` returns HTML instead of `{}` | Symlink broken or `bot_hook.py` not executable              |
+| 403 from bot_hook                   | `WEBHOOK_SECRET_TOKEN` mismatch — fix `.env`, re-run Step 3 |
+| Role stays `pending`                | Run Step 4 (`--bootstrap-it`) first                         |

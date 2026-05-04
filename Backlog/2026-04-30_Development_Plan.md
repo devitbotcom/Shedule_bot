@@ -116,6 +116,8 @@ Owner runs `python main.py --production` on the server and:
 | Maintainability        | Single source of truth   | `shift_hours` in `schedule_mapping.json` drives both message content and cron schedule.            | 004-2 (S004 UAT)          | ✅ S004         |
 | Portability            | Installability           | `docker compose up -d cron` is the only command IT needs for local dev. Production: `--gen-crontab` installs all cron entries automatically — no cPanel UI interaction. | S004 + S004b              | ✅ S004b        |
 | Portability            | Adaptability             | Messenger adapter pattern supports adding Viber (S007) without changes to orchestrator or parser.  | S001 + S004 ext           | ⏸ S007         |
+| Documentation          | Placeholder clarity      | All placeholders in operational docs use `<ALL_CAPS>` format. Values that look real (e.g. `yourdomain.com`) must not be used as placeholders. Each doc that contains placeholders must open with a legend table listing every placeholder and its description. | F9 (S005 UAT)             | ✅ S005         |
+| Documentation          | Deployment traceability  | QA definition of done for any sprint touching deployment instructions must include a deployment trace: verify each step produces the expected observable outcome (git state, curl response, command exit code). | PF1 (S005 UAT)            | ⏳ Process — apply from S006 |
 
 ---
 

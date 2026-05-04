@@ -18,10 +18,10 @@ POC1 notification pipeline is untouched.
 
 The following must already be done on the server (see `readme_WEBHOOK.md` for full steps):
 
-- [ ] Latest code pulled: `cd ~/Shedule_bot && git pull`
-- [ ] `bot_hook.py` symlinked from `public_html/` and `chmod 755`; verify: `curl -s https://yourdomain.com/bot_hook.py` returns `{}`
-- [ ] `.env` has `WEBHOOK_URL`, `WEBHOOK_SECRET_TOKEN`, `TELEGRAM_BOT_TOKEN`, `DB_PATH`
-- [ ] Webhook registered: `cd ~/Shedule_bot && source venv/bin/activate && TZ=Europe/Kyiv python main.py --register-webhook` → `[WEBHOOK] ✅ Registered: …`
+- [+] Latest code pulled: `cd ~/Shedule_bot && git pull`
+- [+] `bot_hook.py` symlinked from `public_html/` and `chmod 755`; verify: `curl -s https://<YOUR_DOMAIN>/bot_hook.py` returns `{}`
+- [+] `.env` has `WEBHOOK_URL`, `WEBHOOK_SECRET_TOKEN`, `TELEGRAM_BOT_TOKEN`, `DB_PATH`
+- [+] Webhook registered: `cd ~/Shedule_bot && source venv/bin/activate && TZ=Europe/Kyiv python main.py --register-webhook` → `[WEBHOOK] ✅ Registered: …`
 
 If prerequisites are not yet done, complete them first — UAT cannot proceed without a live webhook.
 
@@ -161,17 +161,17 @@ Note that user's Telegram ID from the bot's reply to their `/start`.
 
 ## UAT sign-off
 
-| Case | Result | Notes |
-|------|--------|-------|
-| U005-1 | ⬜ | |
-| U005-2 | ⬜ | |
-| U005-3 | ⬜ | |
-| U005-4 | ⬜ | |
-| U005-5 | ⬜ | |
-| U005-6 | ⬜ | |
-| U005-7 | ⬜ | |
-| U005-8 | ⬜ | |
-| U005-9 | ⬜ | |
+| Case   | Result | Notes                        |
+|--------|--------|------------------------------|
+| U005-1 | -      | Bot does not react on /start |
+| U005-2 | ⬜      |                              |
+| U005-3 | ⬜      |                              |
+| U005-4 | ⬜      |                              |
+| U005-5 | ⬜      |                              |
+| U005-6 | ⬜      |                              |
+| U005-7 | ⬜      |                              |
+| U005-8 | ⬜      |                              |
+| U005-9 | ⬜      |                              |
 
 **Owner sign-off:** _________________________________ Date: _____________
 
@@ -179,9 +179,9 @@ Note that user's Telegram ID from the bot's reply to their `/start`.
 
 ## If something goes wrong
 
-| Symptom | Where to look |
-|---------|--------------|
-| Bot does not reply at all | `tail -20 ~/Shedule_bot/data/logs/webhook.log` |
-| `curl https://yourdomain.com/bot_hook.py` returns HTML | Symlink broken or file not executable |
-| Webhook registered but bot still silent | `WEBHOOK_SECRET_TOKEN` mismatch — re-run `--register-webhook` after fixing `.env` |
-| U005-4 fails with `DB_PATH not set` | Check `~/Shedule_bot/.env` has `DB_PATH` set to an absolute path |
+| Symptom                                               | Where to look                                                                     |
+|-------------------------------------------------------|-----------------------------------------------------------------------------------|
+| Bot does not reply at all                             | `tail -20 ~/Shedule_bot/data/logs/webhook.log`                                    |
+| `curl https://<YOUR_DOMAIN>/bot_hook.py` returns HTML | Symlink broken or file not executable                                             |
+| Webhook registered but bot still silent               | `WEBHOOK_SECRET_TOKEN` mismatch — re-run `--register-webhook` after fixing `.env` |
+| U005-4 fails with `DB_PATH not set`                   | Check `~/Shedule_bot/.env` has `DB_PATH` set to an absolute path                  |
