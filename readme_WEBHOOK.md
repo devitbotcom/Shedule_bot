@@ -38,25 +38,24 @@ This tells git to ignore file permission changes on this server. Without it, the
 
 ---
 
-## Step 1 — Symlink the CGI handler
+## Step 1 — Configure the Python App in cPanel
+
+This hosting uses Passenger (WSGI), not CGI. No symlinks are needed.
+
+In **cPanel → Software → Setup Python App**:
+
+1. If no app exists yet: click **Create Application**
+2. Set **Python version** to `3.11.x`
+3. Set **Application root** to `Shedule_bot`
+4. Set **Application URL** to `<YOUR_DOMAIN>/Shedule_bot`
+5. Leave **Application startup file** as `passenger_wsgi.py`
+6. Click **Create** (or **Save**)
+
+Verify the app is reachable:
 
 ```bash
-ln -s ~/Shedule_bot/bot_hook.py ~/public_html/cgi-bin/bot_hook.py
-chmod 755 ~/Shedule_bot/bot_hook.py
-```
-
-> If you see `ln: failed to create symbolic link … File exists`, remove the old entry first:
->
-> ```bash
-> rm ~/public_html/cgi-bin/bot_hook.py
-> ln -s ~/Shedule_bot/bot_hook.py ~/public_html/cgi-bin/bot_hook.py
-> ```
-
-Verify it is reachable:
-
-```bash
-curl -s https://<YOUR_DOMAIN>/cgi-bin/bot_hook.py
-# Expected: {}   (printed on its own line — empty output means a script error)
+curl -s https://<YOUR_DOMAIN>/Shedule_bot
+# Expected: {}
 ```
 
 ---
@@ -72,7 +71,7 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 Add these two lines to `~/Shedule_bot/.env` (e.g. using $ nano .env):
 
 ```
-WEBHOOK_URL=https://<YOUR_DOMAIN>/cgi-bin/bot_hook.py
+WEBHOOK_URL=https://<YOUR_DOMAIN>/Shedule_bot
 WEBHOOK_SECRET_TOKEN=<token from above>
 ```
 
@@ -88,7 +87,7 @@ TZ=Europe/Kyiv python main.py --register-webhook
 Expected output:
 
 ```
-[WEBHOOK] ✅ Registered: https://<YOUR_DOMAIN>/cgi-bin/bot_hook.py
+[WEBHOOK] ✅ Registered: https://<YOUR_DOMAIN>/Shedule_bot
 ```
 
 ---
@@ -135,6 +134,6 @@ curl -s "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/deleteWebhook"
 | Symptom                             | Check                                                       |
 |-------------------------------------|-------------------------------------------------------------|
 | Bot silent after message            | `tail -20 ~/Shedule_bot/data/logs/webhook.log`              |
-| `curl` returns 404 or HTML instead of `{}` | Symlink not in `cgi-bin/`, broken, or `bot_hook.py` not executable |
+| `curl` returns 404 or HTML instead of `{}` | App not started in cPanel, or `passenger_wsgi.py` missing from app root |
 | 403 from bot_hook                   | `WEBHOOK_SECRET_TOKEN` mismatch — fix `.env`, re-run Step 3 |
 | Role stays `pending`                | Run Step 4 (`--bootstrap-it`) first                         |

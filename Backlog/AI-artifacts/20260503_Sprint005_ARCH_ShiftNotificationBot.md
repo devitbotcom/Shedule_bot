@@ -31,19 +31,13 @@ Bot receives Telegram messages via webhook on cPanel. IT can assign roles. Users
 
 ## Key Architectural Decisions
 
-### AD-S005-001 — Webhook via CGI, no persistent process
+### AD-S005-001 — Webhook delivery: no persistent process
 
-Telegram sends a POST to `https://<domain>/cgi-bin/bot_hook.py` on every inbound message. The CGI script reads the JSON body, processes it, replies via Telegram API, and exits. Same "run and exit" model as POC1. No daemon, no polling, no new hosting requirement.
+> ⚠️ **Superseded (2026-05-04):** CGI delivery model is invalid for this hosting — see AD-S005-009, AD-S005-010, and F11 (QA report). Delivery mechanism changed to WSGI/Passenger. The core architectural claim (no persistent process managed by the bot) is superseded — Passenger is a persistent process managed by cPanel, not by the bot.
 
-**CGI setup on Namecheap cPanel (LiteSpeed):**
-- File symlinked into `~/public_html/cgi-bin/` (see AD-S005-009 — this is the only directory where LiteSpeed executes Python CGI)
-- Shebang: `#!/opt/alt/python311/bin/python3.11`
-- `chmod 755 bot_hook.py`
-- Must be accessible over HTTPS (required by Telegram)
+Telegram sends a POST to `https://<domain>/Shedule_bot` on every inbound message. The WSGI application (`passenger_wsgi.py`) reads the JSON body, calls `_handle()`, and returns HTTP 200. Passenger (managed by cPanel) handles the process lifecycle.
 
-**Zero regression guarantee:** `bot_hook.py` is a new standalone file. No imports from `main.py`. No changes to any existing file except `db.py` (additive only).
-
-> ⚠️ **Correction (2026-05-04):** Original AD specified `public_html/` as the CGI location. This was incorrect for Namecheap LiteSpeed hosting — see AD-S005-009 and F10 (QA report).
+**Zero regression guarantee:** `_handle()` in `bot_hook.py` is unchanged. No imports from `main.py`. No changes to any existing file except `db.py` (additive only).
 
 ---
 
@@ -136,15 +130,40 @@ The version string is derived from the running interpreter (`sys.version_info`) 
 
 ---
 
-### AD-S005-009 — CGI directory: `cgi-bin/`, not `public_html/` (LiteSpeed constraint)
+### AD-S005-009 — CGI not available on this hosting (LiteSpeed constraint)
 
-**Date added:** 2026-05-04 — discovered during Owner UAT (F10).
+**Date added:** 2026-05-04 — discovered during Owner UAT (F10, F11).
 
-On Namecheap shared hosting with LiteSpeed Web Server, Python CGI scripts placed directly in `public_html/` are **not executed**. LiteSpeed returns HTTP 404 for both GET and POST requests and does not follow symlinks pointing outside the document root. The pre-configured CGI execution directory is `cgi-bin/` (`~/public_html/cgi-bin/`).
+> ⚠️ **Updated (2026-05-04):** Initial finding (F10) identified `public_html/` as wrong; `cgi-bin/` was attempted as fix. Further testing (F11) confirmed CGI is disabled server-wide — a plain bash script in `cgi-bin/` with `.htaccess` `Options +ExecCGI` also returned 404. CGI is entirely unavailable on this Namecheap account. See AD-S005-010 for the replacement approach.
 
-**Decision:** `bot_hook.py` is symlinked into `~/public_html/cgi-bin/`, not `~/public_html/`. The resulting URL is `https://<domain>/cgi-bin/bot_hook.py`. All references to `WEBHOOK_URL`, `readme_WEBHOOK.md`, `.env.example`, and the `bot_hook.py` docstring are updated accordingly.
+On this Namecheap shared hosting account with LiteSpeed Web Server, CGI script execution is not available from any directory (`public_html/`, `cgi-bin/`, with or without `.htaccess` directives). The platform-supported method for running Python web code is WSGI/Passenger via cPanel "Setup Python App".
 
-**Scope of impact:** `readme_WEBHOOK.md` Step 1 rewritten; `.env.example` `WEBHOOK_URL` comment updated; `bot_hook.py` module docstring updated; AD-S005-001 corrected. No logic changes to any Python file.
+---
+
+### AD-S005-010 — Replace CGI with WSGI/Passenger
+
+**Date added:** 2026-05-04 — replaces CGI delivery model (AD-S005-001, AD-S005-009, F11).
+
+Namecheap cPanel offers "Setup Python App" which deploys Python via Passenger (WSGI). An existing app is already configured at `https://digital-muzzle.com/Shedule_bot` with app root `/home/itbomenf/Shedule_bot` and Python 3.11.15.
+
+**New file: `passenger_wsgi.py`** — WSGI entry point placed in `Shedule_bot/`. Passenger loads this file on startup.
+
+Responsibilities:
+- Inject existing `venv/` site-packages into `sys.path` (same pattern as `bot_hook.py`)
+- Load `.env`
+- Implement `application(environ, start_response)` — the WSGI callable Passenger invokes per request
+- Validate `HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN` from `environ`
+- Read POST body from `environ['wsgi.input']`
+- Call `_handle()` from `bot_hook.py` — **no changes to `_handle()` required**
+- Return HTTP 200 `{}`; return HTTP 403 on wrong secret
+
+**`bot_hook.main()`:** becomes unused for production. Kept for local testing. No removal required.
+
+**`WEBHOOK_URL`:** `https://digital-muzzle.com/Shedule_bot`
+
+**Venv:** existing `Shedule_bot/venv/` injected via `sys.path` — no separate cPanel pip install required.
+
+**Scope of impact:** new file `passenger_wsgi.py`; `readme_WEBHOOK.md` Step 1 rewritten; `.env.example` `WEBHOOK_URL` updated; UAT prerequisites updated. No logic changes to existing Python files.
 
 ---
 
