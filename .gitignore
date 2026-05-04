@@ -43,5 +43,9 @@ shift_bot.db
 logs/
 crontab.generated
 
+# Passenger runtime artefacts
+tmp/
+stderr.log
+
 # Generated test fixtures — run tests/create_fixture.py once before pytest
 tests/fixtures/
