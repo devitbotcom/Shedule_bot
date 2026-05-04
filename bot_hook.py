@@ -1,7 +1,7 @@
 #!/opt/alt/python311/bin/python3.11
 """
 Telegram webhook handler — CGI entry point.
-Symlink from public_html/bot_hook.py to ~/Shedule_bot/bot_hook.py.
+Symlink from ~/public_html/cgi-bin/bot_hook.py to ~/Shedule_bot/bot_hook.py.
 See readme_WEBHOOK.md for setup instructions.
 """
 import json

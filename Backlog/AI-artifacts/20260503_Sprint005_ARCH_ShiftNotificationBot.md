@@ -33,15 +33,17 @@ Bot receives Telegram messages via webhook on cPanel. IT can assign roles. Users
 
 ### AD-S005-001 — Webhook via CGI, no persistent process
 
-Telegram sends a POST to `https://<domain>/bot_hook.py` on every inbound message. The CGI script reads the JSON body, processes it, replies via Telegram API, and exits. Same "run and exit" model as POC1. No daemon, no polling, no new hosting requirement.
+Telegram sends a POST to `https://<domain>/cgi-bin/bot_hook.py` on every inbound message. The CGI script reads the JSON body, processes it, replies via Telegram API, and exits. Same "run and exit" model as POC1. No daemon, no polling, no new hosting requirement.
 
-**CGI setup on Namecheap cPanel:**
-- File placed in `public_html/bot_hook.py` (or `cgi-bin/`)
+**CGI setup on Namecheap cPanel (LiteSpeed):**
+- File symlinked into `~/public_html/cgi-bin/` (see AD-S005-009 — this is the only directory where LiteSpeed executes Python CGI)
 - Shebang: `#!/opt/alt/python311/bin/python3.11`
 - `chmod 755 bot_hook.py`
 - Must be accessible over HTTPS (required by Telegram)
 
 **Zero regression guarantee:** `bot_hook.py` is a new standalone file. No imports from `main.py`. No changes to any existing file except `db.py` (additive only).
+
+> ⚠️ **Correction (2026-05-04):** Original AD specified `public_html/` as the CGI location. This was incorrect for Namecheap LiteSpeed hosting — see AD-S005-009 and F10 (QA report).
 
 ---
 
@@ -134,6 +136,18 @@ The version string is derived from the running interpreter (`sys.version_info`) 
 
 ---
 
+### AD-S005-009 — CGI directory: `cgi-bin/`, not `public_html/` (LiteSpeed constraint)
+
+**Date added:** 2026-05-04 — discovered during Owner UAT (F10).
+
+On Namecheap shared hosting with LiteSpeed Web Server, Python CGI scripts placed directly in `public_html/` are **not executed**. LiteSpeed returns HTTP 404 for both GET and POST requests and does not follow symlinks pointing outside the document root. The pre-configured CGI execution directory is `cgi-bin/` (`~/public_html/cgi-bin/`).
+
+**Decision:** `bot_hook.py` is symlinked into `~/public_html/cgi-bin/`, not `~/public_html/`. The resulting URL is `https://<domain>/cgi-bin/bot_hook.py`. All references to `WEBHOOK_URL`, `readme_WEBHOOK.md`, `.env.example`, and the `bot_hook.py` docstring are updated accordingly.
+
+**Scope of impact:** `readme_WEBHOOK.md` Step 1 rewritten; `.env.example` `WEBHOOK_URL` comment updated; `bot_hook.py` module docstring updated; AD-S005-001 corrected. No logic changes to any Python file.
+
+---
+
 ### AD-S005-006 — Webhook registration
 
 New CLI flag `--register-webhook` added to `main.py` / `cli.py`. Calls Telegram `setWebhook` with `url` + `secret_token`. Run once by IT after deployment. Idempotent.
@@ -144,7 +158,7 @@ cd ~/Shedule_bot && source venv/bin/activate && python main.py --register-webhoo
 
 `.env` requires two new variables:
 ```
-WEBHOOK_URL=https://<domain>/bot_hook.py
+WEBHOOK_URL=https://<domain>/cgi-bin/bot_hook.py
 WEBHOOK_SECRET_TOKEN=<random-hex>
 ```
 
@@ -185,7 +199,7 @@ WEBHOOK_SECRET_TOKEN=<random-hex>
 | # | Question | Needed for | Status |
 |---|---|---|---|
 | OQ-1 | Server domain/path for `WEBHOOK_URL` | D3, D6 | IT to confirm |
-| OQ-2 | Does `public_html/bot_hook.py` need `.htaccess` config to execute as CGI on this server? | D1 | IT to verify on server |
+| OQ-2 | Does `public_html/bot_hook.py` need `.htaccess` config to execute as CGI on this server? | D1 | ✅ Resolved 2026-05-04: `public_html/` does not execute CGI on LiteSpeed. Use `cgi-bin/` — no `.htaccess` required. See AD-S005-009. |
 
 ---
 

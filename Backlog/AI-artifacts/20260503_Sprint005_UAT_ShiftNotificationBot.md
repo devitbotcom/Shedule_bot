@@ -19,9 +19,9 @@ POC1 notification pipeline is untouched.
 The following must already be done on the server (see `readme_WEBHOOK.md` for full steps):
 
 - [+] Latest code pulled: `cd ~/Shedule_bot && git pull`
-- [+] `bot_hook.py` symlinked from `public_html/` and `chmod 755`; verify: `curl -s https://<YOUR_DOMAIN>/bot_hook.py` returns `{}`
+- [ ] `bot_hook.py` symlinked into `public_html/cgi-bin/` and `chmod 755`; verify: `curl -s https://<YOUR_DOMAIN>/cgi-bin/bot_hook.py` returns `{}`
 - [+] `.env` has `WEBHOOK_URL`, `WEBHOOK_SECRET_TOKEN`, `TELEGRAM_BOT_TOKEN`, `DB_PATH`
-- [+] Webhook registered: `cd ~/Shedule_bot && source venv/bin/activate && TZ=Europe/Kyiv python main.py --register-webhook` → `[WEBHOOK] ✅ Registered: …`
+- [ ] Webhook registered: `cd ~/Shedule_bot && source venv/bin/activate && TZ=Europe/Kyiv python main.py --register-webhook` → `[WEBHOOK] ✅ Registered: https://<YOUR_DOMAIN>/cgi-bin/bot_hook.py`
 
 If prerequisites are not yet done, complete them first — UAT cannot proceed without a live webhook.
 
