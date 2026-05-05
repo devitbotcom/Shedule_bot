@@ -19,9 +19,9 @@ POC1 notification pipeline is untouched.
 The following must already be done on the server (see `readme_WEBHOOK.md` for full steps):
 
 - [+] Latest code pulled: `cd ~/Shedule_bot && git pull`
-- [ ] `passenger_wsgi.py` present in `~/Shedule_bot/`; cPanel Python App running with app root `Shedule_bot`; verify: `curl -s https://<YOUR_DOMAIN>/Shedule_bot` returns `{}`
+- [+] `passenger_wsgi.py` present in `~/Shedule_bot/`; cPanel Python App running with app root `Shedule_bot`; verify: `curl -s https://<YOUR_DOMAIN>/Shedule_bot` returns `{}`
 - [+] `.env` has `WEBHOOK_URL`, `WEBHOOK_SECRET_TOKEN`, `TELEGRAM_BOT_TOKEN`, `DB_PATH`
-- [ ] Webhook registered: `cd ~/Shedule_bot && source venv/bin/activate && TZ=Europe/Kyiv python main.py --register-webhook` → `[WEBHOOK] ✅ Registered: https://<YOUR_DOMAIN>/Shedule_bot`
+- [+] Webhook registered: `cd ~/Shedule_bot && source venv/bin/activate && TZ=Europe/Kyiv python main.py --register-webhook` → `[WEBHOOK] ✅ Registered: https://<YOUR_DOMAIN>/Shedule_bot`
 
 If prerequisites are not yet done, complete them first — UAT cannot proceed without a live webhook.
 
@@ -64,6 +64,7 @@ ID: <number>
 ---
 
 ### U005-3 — Help menu for unprivileged user
+STATUS - PASSED
 
 **Steps:**
 1. Send `/help`
@@ -74,6 +75,7 @@ ID: <number>
 ---
 
 ### U005-4 — Bootstrap IT admin (server command)
+STATUS - PASSED
 
 **Actor:** Owner, on the server via SSH or cPanel Terminal  
 **Steps:**
@@ -93,6 +95,7 @@ ID: <number>
 ---
 
 ### U005-5 — Help menu for IT admin
+STATUS - PASSED
 
 **Steps:**
 1. Send `/help` from the same account used in U005-4
@@ -103,6 +106,7 @@ ID: <number>
 ---
 
 ### U005-6 — Assign a role (IT admin action)
+STATUS - PASSED
 
 **Prerequisite:** a second Telegram account has already messaged the bot (so it is registered).  
 Note that user's Telegram ID from the bot's reply to their `/start`.
@@ -123,6 +127,7 @@ Note that user's Telegram ID from the bot's reply to their `/start`.
 ---
 
 ### U005-7 — Role assignment blocked for non-IT user
+STATUS - SKIPPED (to test later)
 
 **Actor:** any user with role `pending` or `staff`  
 **Steps:**
@@ -138,6 +143,7 @@ Note that user's Telegram ID from the bot's reply to their `/start`.
 ---
 
 ### U005-8 — Unknown command
+STATUS - FAILED - bot reacte on absolutely any message, not only commands (chat message, add user, etc).
 
 **Steps:**
 1. Send any unrecognised text, e.g. `/hello`
@@ -148,6 +154,7 @@ Note that user's Telegram ID from the bot's reply to their `/start`.
 ---
 
 ### U005-9 — POC1 notifications unaffected (regression)
+STATUS - PASSED
 
 **Steps:**
 1. Run the existing notification pipeline as normal (or dry-run):
@@ -161,17 +168,17 @@ Note that user's Telegram ID from the bot's reply to their `/start`.
 
 ## UAT sign-off
 
-| Case   | Result | Notes                        |
-|--------|--------|------------------------------|
-| U005-1 | -      | Bot does not react on /start |
-| U005-2 | ⬜      |                              |
-| U005-3 | ⬜      |                              |
-| U005-4 | ⬜      |                              |
-| U005-5 | ⬜      |                              |
-| U005-6 | ⬜      |                              |
-| U005-7 | ⬜      |                              |
-| U005-8 | ⬜      |                              |
-| U005-9 | ⬜      |                              |
+| Case   | Result  | Notes                                                                                  |
+|--------|---------|----------------------------------------------------------------------------------------|
+| U005-1 | Pass    |                                                                                        |
+| U005-2 | Pass    |                                                                                        |
+| U005-3 | Pass    |                                                                                        |
+| U005-4 | Pass    |                                                                                        |
+| U005-5 | SKIPPED | to clarify if neerd, and test later                                                    |
+| U005-6 | Pass    |                                                                                        |
+| U005-7 | Pass    |                                                                                        |
+| U005-8 | FAILED  | bot reacte on absolutely any message, not only commands (chat message, add user, etc). |
+| U005-9 | Pass    |                                                                                        |
 
 **Owner sign-off:** _________________________________ Date: _____________
 
@@ -185,3 +192,21 @@ Note that user's Telegram ID from the bot's reply to their `/start`.
 | `curl https://<YOUR_DOMAIN>/bot_hook.py` returns HTML | Symlink broken or file not executable                                             |
 | Webhook registered but bot still silent               | `WEBHOOK_SECRET_TOKEN` mismatch — re-run `--register-webhook` after fixing `.env` |
 | U005-4 fails with `DB_PATH not set`                   | Check `~/Shedule_bot/.env` has `DB_PATH` set to an absolute path                  |
+
+
+
+## Feedback  
+
+### 005-1 Can admin be a setting file not only defined by communication with bot as now [High, on hold]
+
+   Actual: U005-4: run on the server:
+   ```
+   cd ~/Shedule_bot && source venv/bin/activate                                                                                                                                     
+   TZ=Europe/Kyiv python main.py --bootstrap-it <YOUR_TELEGRAM_ID>
+   
+   Replace <YOUR_TELEGRAM_ID> with the ID shown in the /start reply.   
+   ```
+
+### 005-2 Too obsessive for commands [Minor, on hold]
+
+Actual: bot reacts on absolutely any message, not only commands (chat message, add user, etc).
