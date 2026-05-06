@@ -19,6 +19,9 @@
     "holiday": "09:00",
     "other":   "09:00"
   },
-  "staff_tab": "Staff",
-  "schedule_tab": "Schedule"
+  "scheduler_staff_tab":    "Staff",
+  "scheduler_schedule_tab": "Draft",
+  "scheduler_output_tab":   "Draft-by-bot",
+  "scheduler_month_cell":   "A1",
+  "scheduler_year_cell":    "B1"
 }

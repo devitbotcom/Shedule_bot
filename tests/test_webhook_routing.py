@@ -182,3 +182,59 @@ def test_handle_ignores_message_without_from(db, monkeypatch):
     monkeypatch.setattr("bot_hook._send", sent)
     _handle({"message": {"chat": {"id": 1}, "text": "/start"}}, token="T", db_path=db)
     assert sent.count == 0
+
+
+# ---------------------------------------------------------------------------
+# /draft — role gating
+# ---------------------------------------------------------------------------
+
+@pytest.fixture()
+def head_db(tmp_path):
+    from db import init_users_table, init_conversations_table, upsert_user, set_user_role
+    path = str(tmp_path / "head.db")
+    init_users_table(path)
+    init_conversations_table(path)
+    upsert_user(path, "200", "Head User")
+    set_user_role(path, "200", "head")
+    return path
+
+
+def test_draft_denied_for_pending(db, monkeypatch):
+    sent = _FakeSend()
+    monkeypatch.setattr("bot_hook._send", sent)
+    _handle(_make_update("/draft", telegram_id="42"), token="T", db_path=db)
+    assert "⛔" in sent.last_text
+
+
+def test_draft_denied_for_staff(tmp_path, monkeypatch):
+    from db import init_users_table, init_conversations_table, upsert_user, set_user_role
+    path = str(tmp_path / "staff.db")
+    init_users_table(path)
+    init_conversations_table(path)
+    upsert_user(path, "300", "Staff User")
+    set_user_role(path, "300", "staff")
+    sent = _FakeSend()
+    monkeypatch.setattr("bot_hook._send", sent)
+    _handle(_make_update("/draft", telegram_id="300"), token="T", db_path=path)
+    assert "⛔" in sent.last_text
+
+
+def test_draft_calls_cmd_draft_for_head(head_db, monkeypatch):
+    called = []
+    monkeypatch.setattr("bot_hook._cmd_draft", lambda t, c: called.append((t, c)))
+    _handle(_make_update("/draft", telegram_id="200"), token="T", db_path=head_db)
+    assert called == [("T", "200")]
+
+
+def test_help_shows_draft_for_head(head_db, monkeypatch):
+    sent = _FakeSend()
+    monkeypatch.setattr("bot_hook._send", sent)
+    _handle(_make_update("/help", telegram_id="200"), token="T", db_path=head_db)
+    assert "/draft" in sent.last_text
+
+
+def test_help_hides_draft_for_pending(db, monkeypatch):
+    sent = _FakeSend()
+    monkeypatch.setattr("bot_hook._send", sent)
+    _handle(_make_update("/help", telegram_id="42"), token="T", db_path=db)
+    assert "/draft" not in sent.last_text

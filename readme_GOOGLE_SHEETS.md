@@ -73,7 +73,7 @@ ls ~/Shedule_bot/data/service_account.json
 1. Open your Google Sheet
 2. Click **Share**
 3. Enter `<SERVICE_ACCOUNT_EMAIL>` (from the downloaded JSON file, field `"client_email"`)
-4. Set permission to **Viewer**
+4. Set permission to **Editor**
 5. Click **Send**
 
 Find the service account email in the JSON file if needed:
@@ -105,8 +105,11 @@ Open `~/Shedule_bot/data/schedule_mapping.json` and confirm these keys match the
 
 ```json
 {
-  "staff_tab": "Staff",
-  "schedule_tab": "Schedule"
+  "scheduler_staff_tab":    "Staff",
+  "scheduler_schedule_tab": "Draft",
+  "scheduler_output_tab":   "Draft-by-bot",
+  "scheduler_month_cell":   "A1",
+  "scheduler_year_cell":    "B1"
 }
 ```
 
@@ -135,6 +138,6 @@ Staff rows: <number>
 |--------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | `FileNotFoundError: service_account.json`        | Verify the file path in `GOOGLE_SERVICE_ACCOUNT_JSON` is absolute and the file exists                          |
 | `gspread.exceptions.SpreadsheetNotFound`         | Verify `GOOGLE_SHEET_ID` in `.env`; verify the sheet is shared with the service account email                  |
-| `gspread.exceptions.WorksheetNotFound`           | Verify `staff_tab` / `schedule_tab` in `schedule_mapping.json` match actual tab names exactly (case-sensitive) |
+| `gspread.exceptions.WorksheetNotFound`           | Verify `scheduler_staff_tab` / `scheduler_schedule_tab` / `scheduler_output_tab` in `schedule_mapping.json` match actual tab names exactly (case-sensitive) |
 | `google.auth.exceptions.TransportError`          | Server has no internet access or Google APIs are blocked                                                       |
 | `ModuleNotFoundError: No module named 'gspread'` | Run `pip install -r requirements.txt` in venv                                                                  |

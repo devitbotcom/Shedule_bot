@@ -114,11 +114,12 @@ New file `schedule_generator.py`. Interface:
 def generate_schedule(
     staff_list: list[dict],       # from get_staff_list — {name, department}
     template_grid: list[list],    # from get_schedule_grid — raw 2D grid (Draft tab)
-    month: int,
-    year: int,
+    mapping: dict,                # schedule_mapping.json contents — header_row, day_type_column, department_columns
 ) -> list[list]:
     """Returns filled grid ready to write to Draft-by-bot tab."""
 ```
+
+> **Note (F1 fix 2026-05-06):** Initial spec included `month` and `year` parameters. They are not needed by the algorithm — the template grid already carries the date structure. `mapping` is required for `header_row`, `day_type_column`, and `department_columns`. Month and year are read separately by `_cmd_draft` via `read_cell` for the confirmation message only.
 
 **Algorithm:**
 
@@ -170,7 +171,7 @@ Writing to Google Sheets requires **Editor** permission. `readme_GOOGLE_SHEETS.m
 
 | #    | Question                                                                  | Needed for  | Status                                             |
 |------|---------------------------------------------------------------------------|-------------|----------------------------------------------------|
-| OQ-1 | Which file / handler owns Telegram command routing for `/draft`?          | D5          | ⏸ Developer to confirm from S005 webhook structure |
+| OQ-1 | Which file / handler owns Telegram command routing for `/draft`?          | D5          | ✅ Resolved — `bot_hook.py` (`_handle` function, `_cmd_draft` helper) |
 
 ---
 
@@ -178,7 +179,7 @@ Writing to Google Sheets requires **Editor** permission. `readme_GOOGLE_SHEETS.m
 
 | Role      | Date       | Status                |
 |-----------|------------|-----------------------|
-| Architect | 2026-05-06 | ✅ Ready for Developer |
-| Developer | —          | ⏸                     |
-| QA        | —          | ⏸                     |
-| Owner     | —          | ⏸                     |
+| Architect | 2026-05-06 | ✅ F1 + F4 fixed 2026-05-06 |
+| Developer | 2026-05-06 | ✅                          |
+| QA        | 2026-05-06 | ⚠️ F2, F3 open             |
+| Owner     | —          | ⏸ UAT pending              |

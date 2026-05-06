@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+import gspread
 import pytest
 
 from google_sheets_adapter import (
@@ -7,6 +8,8 @@ from google_sheets_adapter import (
     STAFF_NAME_COL,
     get_schedule_grid,
     get_staff_list,
+    read_cell,
+    write_schedule_grid,
 )
 
 
@@ -80,3 +83,44 @@ def test_adapter_opens_correct_sheet_and_tab(mock_sa):
     get_schedule_grid("my-sheet-id", "MyTab", "/creds.json")
     gc.open_by_key.assert_called_once_with("my-sheet-id")
     gc.open_by_key.return_value.worksheet.assert_called_once_with("MyTab")
+
+
+@patch("google_sheets_adapter.gspread.service_account")
+def test_read_cell_returns_string_value(mock_sa):
+    ws = MagicMock()
+    ws.acell.return_value.value = "червень"
+    gc = MagicMock()
+    gc.open_by_key.return_value.worksheet.return_value = ws
+    mock_sa.return_value = gc
+    result = read_cell("sheet-id", "Draft", "A1", "/creds.json")
+    assert result == "червень"
+    ws.acell.assert_called_once_with("A1")
+
+
+@patch("google_sheets_adapter.gspread.service_account")
+def test_write_schedule_grid_overwrites_existing_tab(mock_sa):
+    ws = MagicMock()
+    spreadsheet = MagicMock()
+    spreadsheet.worksheet.return_value = ws
+    gc = MagicMock()
+    gc.open_by_key.return_value = spreadsheet
+    mock_sa.return_value = gc
+    rows = [["a", "b"], ["c", "d"]]
+    write_schedule_grid("sheet-id", "Draft-by-bot", rows, "/creds.json")
+    ws.clear.assert_called_once()
+    ws.update.assert_called_once_with(rows)
+
+
+@patch("google_sheets_adapter.gspread.service_account")
+def test_write_schedule_grid_creates_tab_if_absent(mock_sa):
+    new_ws = MagicMock()
+    spreadsheet = MagicMock()
+    spreadsheet.worksheet.side_effect = gspread.exceptions.WorksheetNotFound("Draft-by-bot")
+    spreadsheet.add_worksheet.return_value = new_ws
+    gc = MagicMock()
+    gc.open_by_key.return_value = spreadsheet
+    mock_sa.return_value = gc
+    rows = [["x", "y"]]
+    write_schedule_grid("sheet-id", "Draft-by-bot", rows, "/creds.json")
+    spreadsheet.add_worksheet.assert_called_once()
+    new_ws.update.assert_called_once_with(rows)
