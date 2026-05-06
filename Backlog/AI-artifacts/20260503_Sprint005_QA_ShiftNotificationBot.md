@@ -132,9 +132,10 @@ assert "Використання" in sent.last_text
 
 ## Overall verdict
 
-**🔴 BLOCKED — F11 open.**  
-Initial QA pass found no blockers (F1–F5 all 🔵 Low). Two blockers (F6, F7) were discovered during Owner UAT and fixed by Developer. A third blocker (F10) identified wrong CGI directory; attempted fix (`cgi-bin/`) also failed. A fourth blocker (F11) confirmed CGI is disabled server-wide — the entire CGI delivery model is invalid for this hosting. Architect approved replacement: WSGI/Passenger via cPanel "Setup Python App" (AD-S005-010). Developer implementing `passenger_wsgi.py`.
+**✅ ACCEPTED — 2026-05-05. Known issues on-hold.**  
+All blockers resolved. UAT completed: 7 Pass, 1 Failed (U005-8 → backlog 005-2 on-hold), 1 Skipped (U005-5 → backlog 005-3 deferred). Owner accepted S005 with known issues on-hold.
 
-**Open blockers:** F11 resolved (`passenger_wsgi.py` deployed, POST returns `{}`). F12 open — `tmp/` and `stderr.log` not in `.gitignore`; server `git status` is dirty. Fix applied to `.gitignore` in repo; Owner must `git pull` on server to resolve.
-
-**Open low items:** F1 (dead import), F3 (hardcoded name), F4 (missing CLI tests), F5 (CGI path not unit-tested). May be deferred to a future sprint.
+**Open non-blocking items:**
+- F12 — `.gitignore` fix applied in repo; Owner to `git pull` on server
+- F13 — `readme_WEBHOOK.md` troubleshooting incomplete; Developer to address in next sprint
+- F1, F3, F4, F5 — low severity; deferred to future sprint

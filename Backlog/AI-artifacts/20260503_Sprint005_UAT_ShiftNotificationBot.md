@@ -174,13 +174,13 @@ STATUS - PASSED
 | U005-2 | Pass    |                                                                                        |
 | U005-3 | Pass    |                                                                                        |
 | U005-4 | Pass    |                                                                                        |
-| U005-5 | SKIPPED | to clarify if neerd, and test later                                                    |
+| U005-5 | SKIPPED | Intentionally deferred — see backlog 005-3                                             |
 | U005-6 | Pass    |                                                                                        |
 | U005-7 | Pass    |                                                                                        |
 | U005-8 | FAILED  | bot reacte on absolutely any message, not only commands (chat message, add user, etc). |
 | U005-9 | Pass    |                                                                                        |
 
-**Owner sign-off:** _________________________________ Date: _____________
+**Status:** ✅ Accepted — 2026-05-05. Known issues 005-1, 005-2 on-hold. U005-5 deferred (005-3).
 
 ---
 

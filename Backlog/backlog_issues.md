@@ -14,3 +14,7 @@ Actual: U005-4: run on the server:
 ### 005-2 Too obsessive for commands [Minor, on hold]
 
 Actual: bot reacts on absolutely any message, not only commands (chat message, add user, etc).
+
+### 005-3 U005-5 help menu for IT admin not verified [Risk, deferred]
+
+U005-5 (verify `/setrole` appears in `/help` for IT role) was skipped during UAT. Deferred — to be tested when IT admin role is exercised in S006d or later.

@@ -8,33 +8,36 @@
 
 ## Goal
 
-Head triggers the bot via Telegram, receives an algorithmically generated full-month duty schedule, refines it with free-text constraints (AI-normalised), and gets the result as XLSX ready for the existing POC1 send pipeline.
+Head triggers the bot via Telegram, receives an algorithmically generated full-month duty schedule, and refines it with free-text constraints (AI-normalised). The result is exported in a format compatible with the POC1 notification pipeline. Scheduling and notifications are independent processes — IT runs notifications separately.
 
 ---
 
 ## Scope
 
-| In | Out |
-|---|---|
+| In                                                                      | Out                                  |
+|-------------------------------------------------------------------------|--------------------------------------|
 | Telegram inbound: **webhook** (Telegram POSTs to cPanel HTTPS endpoint) | Polling / cron-based message reading |
-| Role registry: IT / Head / Staff | Viber |
-| Algorithmic full-month schedule generation | AI-generated schedule |
-| Head dialogue: generate → review → refine | Payroll, web UI |
-| AI normalisation of free-text constraints (Input 6) | Multi-location |
-| XLSX export matching POC1 input format | Staff self-registration (post-POC2) |
-| XLSX / Google Drive URL validation for gaps (SHOULD) | Google Drive write-back |
-| POC1 notification pipeline: **unchanged, zero regression** | — |
+| Role registry: IT / Head / Staff                                        | Viber                                |
+| Algorithmic full-month schedule generation                              | AI-generated schedule                |
+| Head dialogue: generate → review → refine                               | Payroll, web UI                      |
+| AI normalisation of free-text constraints (Input 6)                     | Multi-location                       |
+| XLSX export matching POC1 input format                                  | Staff self-registration (post-POC2)  |
+| XLSX / Google Drive URL validation for gaps (SHOULD)                    | Google Drive write-back              |
+| POC1 notification pipeline: **unchanged, zero regression**              | —                                    |
 
 ---
 
 ## Roadmap
 
-| Sprint | Scope | Status |
-|---|---|---|
-| S005 | Bot listener: `getUpdates` polling, command routing, role registry, conversation state in DB | ⏸ Planned |
-| S006 | Schedule generation algorithm: full month, shift rules, balanced allocation, XLSX export | ⏸ Planned |
-| S007 | Head dialogue: `/generate` command, draft review, free-text → AI normalisation → refinement loop | ⏸ Planned |
-| S008 | XLSX / Google Drive URL validation: gap check, rule violations, report to Head (SHOULD) | ⏸ Planned |
+| Sprint | Scope                                                                                                                                                                      | Status                                                                     |
+|--------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| S005   | Webhook infrastructure: Passenger/WSGI on cPanel, user registration, role system, commands `/start` `/whoami` `/help` `/setrole`                                           | ✅ Accepted 2026-05-05 — backlog 005-1, 005-2 on-hold; F12/F13 non-blocking |
+| S006a  | Google Sheets integration — read staff list and schedule grid from named Google Sheet tab; scheduling input/output stays in Sheets; no connection to notification pipeline | ⏸ Planned                                                                  |
+| S006b  | Schedule generation — weighted greedy algorithm; input: staff list + month + day-types; output: filled XLSX grid                                                           | ⏸ Planned                                                                  |
+| S006c  | Head preferences — category-based constraints per person (blackout days, day-type restrictions); applied during generation                                                 | ⏸ Planned                                                                  |
+| S006d  | End-to-end flow — Head triggers generation via bot command; result written to XLSX in POC1-compatible format; IT runs notifications as a separate independent process      | ⏸ Planned                                                                  |
+| S007   | Head dialogue: `/generate` command, draft review, free-text → AI normalisation → refinement loop                                                                           | ⏸ Planned                                                                  |
+| S008   | XLSX / Google Drive URL validation: gap check, rule violations, report to Head (SHOULD)                                                                                    | ⏸ Planned                                                                  |
 
 ---
 
@@ -56,9 +59,9 @@ Head triggers the bot via Telegram, receives an algorithmically generated full-m
 
 ## Open Questions
 
-| # | Question | Needed for |
-|---|---|---|
-| OQ-1 | How many staff per department? (affects algorithm balance) | S006 |
-| OQ-2 | Can one staff member appear in multiple departments? | S006 |
-| OQ-3 | Does Head approve the final schedule inside the bot, or export and approve externally? | S007 |
-| OQ-4 | Google Drive URL — public share link or Drive API with auth? | S008 |
+| #    | Question                                                                               | Needed for | Answer                                          |
+|------|----------------------------------------------------------------------------------------|------------|-------------------------------------------------|
+| OQ-1 | How many staff per department? (affects algorithm balance)                             | S006       | We have stff list in xlsx (several dozens)      |
+| OQ-2 | Can one staff member appear in multiple departments?                                   | S006       | Usually not, but it is possible as exception    |
+| OQ-3 | Does Head approve the final schedule inside the bot, or export and approve externally? | S007       | Head uploads (apporcval happens outside of bot) |
+| OQ-4 | Google Drive URL — public share link or Drive API with auth?                           | S008       | For test can start wit public. Auth for prod.   |

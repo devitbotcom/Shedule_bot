@@ -18,5 +18,7 @@
     "labor":   "17:00",
     "holiday": "09:00",
     "other":   "09:00"
-  }
+  },
+  "staff_tab": "Staff",
+  "schedule_tab": "Schedule"
 }
