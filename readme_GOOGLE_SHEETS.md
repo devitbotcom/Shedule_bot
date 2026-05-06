@@ -117,15 +117,7 @@ If your tabs have different names, update the values here.
 ## Step 7 — Verify
 
 ```bash
-cd ~/Shedule_bot && source venv/bin/activate && python3 -c "
-import os
-from dotenv import load_dotenv
-load_dotenv('.env')
-from google_sheets_adapter import get_staff_list
-staff = get_staff_list(os.environ['GOOGLE_SHEET_ID'], 'Staff', os.environ['GOOGLE_SERVICE_ACCOUNT_JSON'])
-print(f'Staff rows: {len(staff)}')
-for s in staff[:3]: print(s)
-"
+cd ~/Shedule_bot && source venv/bin/activate && python3 -c "import os; from dotenv import load_dotenv; load_dotenv('.env'); from google_sheets_adapter import get_staff_list; staff = get_staff_list(os.environ['GOOGLE_SHEET_ID'], 'Staff', os.environ['GOOGLE_SERVICE_ACCOUNT_JSON']); print(f'Staff rows: {len(staff)}'); [print(s) for s in staff[:3]]"
 ```
 
 Expected output:

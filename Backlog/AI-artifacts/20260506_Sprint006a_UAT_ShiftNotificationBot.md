@@ -20,7 +20,7 @@ https://docs.google.com/spreadsheets/d/1lKX5ntqGN2UPf9LSDDKJTsGKtHmQiPK2BhtS61OC
 ## Prerequisites before starting UAT
 
 - [+ ] Latest code pulled and dependencies installed: `cd ~/Shedule_bot && git pull && source venv/bin/activate && pip install -r requirements.txt`
-- [ ] Google Sheets integration configured — follow [readme_GOOGLE_SHEETS.md](../../readme_GOOGLE_SHEETS.md) Steps 1–6
+- [+ ] Google Sheets integration configured — follow [readme_GOOGLE_SHEETS.md](../../readme_GOOGLE_SHEETS.md) Steps 1–6
 
 If prerequisites are not yet done, complete them first — UAT cannot proceed without credentials and sheet access.
 
@@ -30,19 +30,13 @@ If prerequisites are not yet done, complete them first — UAT cannot proceed wi
 
 ### U006a-1 — Read staff list from Google Sheets
 
+STATUS - DONE
+
 **Actor:** Owner, on the server via SSH or cPanel Terminal  
 **Steps:**
 1. Run:
    ```bash
-   cd ~/Shedule_bot && source venv/bin/activate && python3 -c "
-   import os, sys
-   from dotenv import load_dotenv
-   load_dotenv('.env')
-   from google_sheets_adapter import get_staff_list
-   staff = get_staff_list(os.environ['GOOGLE_SHEET_ID'], 'Staff', os.environ['GOOGLE_SERVICE_ACCOUNT_JSON'])
-   print(f'Staff rows: {len(staff)}')
-   for s in staff[:3]: print(s)
-   "
+   cd ~/Shedule_bot && source venv/bin/activate && python3 -c "import os; from dotenv import load_dotenv; load_dotenv('.env'); from google_sheets_adapter import get_staff_list; staff = get_staff_list(os.environ['GOOGLE_SHEET_ID'], 'Staff', os.environ['GOOGLE_SERVICE_ACCOUNT_JSON']); print(f'Staff rows: {len(staff)}'); [print(s) for s in staff[:3]]"
    ```
 
 **Expected output:**
@@ -58,18 +52,12 @@ Staff rows: <number>
 
 ### U006a-2 — Read schedule grid from Google Sheets
 
+STATUS - DONE
+
 **Steps:**
 1. Run:
    ```bash
-   cd ~/Shedule_bot && source venv/bin/activate && python3 -c "
-   import os
-   from dotenv import load_dotenv
-   load_dotenv('.env')
-   from google_sheets_adapter import get_schedule_grid
-   rows = get_schedule_grid(os.environ['GOOGLE_SHEET_ID'], 'Schedule', os.environ['GOOGLE_SERVICE_ACCOUNT_JSON'])
-   print(f'Schedule rows: {len(rows)}')
-   if rows: print('First row:', rows[0])
-   "
+   cd ~/Shedule_bot && source venv/bin/activate && python3 -c "import os; from dotenv import load_dotenv; load_dotenv('.env'); from google_sheets_adapter import get_schedule_grid; rows = get_schedule_grid(os.environ['GOOGLE_SHEET_ID'], 'Schedule', os.environ['GOOGLE_SERVICE_ACCOUNT_JSON']); print(f'Schedule rows: {len(rows)}'); print('First row:', rows[0]) if rows else None"
    ```
 
 **Expected output:**
@@ -84,6 +72,8 @@ First row: [...]
 
 ### U006a-3 — Wrong credentials fail cleanly
 
+STATUS - DONE
+
 **Steps:**
 1. Temporarily set `GOOGLE_SERVICE_ACCOUNT_JSON=/nonexistent/path.json` in `.env`
 2. Run the U006a-1 command again
@@ -96,6 +86,8 @@ First row: [...]
 ---
 
 ### U006a-4 — POC1 notification pipeline unaffected (regression)
+
+STATUS - DONE
 
 **Steps:**
 1. Run:
@@ -111,12 +103,12 @@ First row: [...]
 
 | Case     | Result | Notes |
 |----------|--------|-------|
-| U006a-1  |        |       |
-| U006a-2  |        |       |
-| U006a-3  |        |       |
-| U006a-4  |        |       |
+| U006a-1  | done   |       |
+| U006a-2  | done   |       |
+| U006a-3  | done   |       |
+| U006a-4  | done   |       |
 
-**Status:** ⏸ Pending
+**Status:** Accepted
 
 ---
 
@@ -152,3 +144,5 @@ Can it be
   "scheduler_schedule_tab": "Draft"
 }
 ```
+
+### 06-2 console commands in UAT script are not applicable as one line for copy-paste.
