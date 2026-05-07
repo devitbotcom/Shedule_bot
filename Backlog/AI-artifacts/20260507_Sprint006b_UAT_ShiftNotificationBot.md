@@ -31,7 +31,7 @@ https://docs.google.com/spreadsheets/d/1lKX5ntqGN2UPf9LSDDKJTsGKtHmQiPK2BhtS61OC
   }
   ```
 - [ +] `Draft` tab in the Google Sheet has month name in A1 (Ukrainian, e.g. `травень`), year in B1 (e.g. `2026`), day-type column pre-populated
-- [ ] Head user role assigned: `/setrole <your_telegram_id> head`
+- [+ ] Head user role assigned: `/setrole <your_telegram_id> head`
 - [ +] Latest code pulled and dependencies installed: `cd ~/Shedule_bot && git pull && source venv/bin/activate && pip install -r requirements.txt`
 
 ---

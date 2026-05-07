@@ -29,15 +29,16 @@ Head triggers the bot via Telegram, receives an algorithmically generated full-m
 
 ## Roadmap
 
-| Sprint  | Scope                                                                                                                                                                       | Status                                                                      |
-|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
-| S005    | Webhook infrastructure: Passenger/WSGI on cPanel, user registration, role system, commands `/start` `/whoami` `/help` `/setrole`                                            | ✅ Accepted 2026-05-05 — backlog 005-1, 005-2 on-hold; F12/F13 non-blocking  |
-| S006a   | Google Sheets integration — read staff list and schedule grid from named Google Sheet tab; scheduling input/output stays in Sheets; no connection to notification pipeline  | ✅ Accepted 2026-05-06                                                       |
-| S006b   | Schedule generation — weighted greedy algorithm; input: staff list + month/year from Google Sheet; output: `Draft-by-bot` tab in Google Sheet; `/draft` command for Head    | 🏗 ARCH complete 2026-05-06                                                 |
-| S006c   | Head preferences — category-based constraints per person (blackout days, day-type restrictions); applied during generation                                                  | ⏸ Planned                                                                   |
-| S006d   | End-to-end flow — Head triggers generation via bot command; result written to XLSX in POC1-compatible format; IT runs notifications as a separate independent process       | ⏸ Planned                                                                   |
-| S007    | Head dialogue: `/generate` command, draft review, free-text → AI normalisation → refinement loop                                                                            | ⏸ Planned                                                                   |
-| S008    | XLSX / Google Drive URL validation: gap check, rule violations, report to Head (SHOULD)                                                                                     | ⏸ Planned                                                                   |
+| Sprint  | Scope                                                                                                                                                                      | Status                                                                     |
+|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| S005    | Webhook infrastructure: Passenger/WSGI on cPanel, user registration, role system, commands `/start` `/whoami` `/help` `/setrole`                                           | ✅ Accepted 2026-05-05 — backlog 005-1, 005-2 on-hold; F12/F13 non-blocking |
+| S006a   | Google Sheets integration — read staff list and schedule grid from named Google Sheet tab; scheduling input/output stays in Sheets; no connection to notification pipeline | ✅ Accepted 2026-05-06                                                      |
+| S006b   | Schedule generation — weighted greedy algorithm; input: staff list + month/year from Google Sheet; output: `Draft-by-bot` tab in Google Sheet; `/draft` command for Head   | ✅ Accepted 2026-05-07                                                      |
+| S006b2  | Draft validation warnings — non-blocking checks (empty staff, day count, day order, Sat/Sun vs holiday); appended to `/draft` reply and logged                             | 🏗 ARCH complete 2026-05-07                                                |
+| S006c   | Head preferences — pre-filled cells in Draft tab treated as fixed constraints; algorithm skips non-empty cells during generation                                           | ⏸ Planned                                                                  |
+| S006d   | ~~Dropped~~ — XLSX export is manual: IT downloads `Draft-by-bot` from Google Sheets, copies to server as `schedule.xlsx`                                                   | ❌ Dropped 2026-05-07                                                       |
+| S007    | Head dialogue: free-text → AI normalisation → constraint application → regeneration loop                                                                                   | ⏸ Planned                                                                  |
+| S008    | XLSX / Google Drive URL validation: gap check, rule violations, report to Head (SHOULD)                                                                                    | ⏸ Planned                                                                  |
 
 ---
 
