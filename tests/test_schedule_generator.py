@@ -82,6 +82,35 @@ def test_generate_unknown_department_column_no_crash():
     assert result[1][2] == "Alice"
 
 
+def test_scheduler_keys_override_shared_keys():
+    staff = [{"name": "Alice", "department": "Surgery"}]
+    grid = [
+        ["Date", "Day-type", "Surgery"],
+        ["2026-06-01", "labor", ""],
+    ]
+    mapping = {
+        "header_row": 99,           # wrong — should be ignored
+        "day_type_column": "WRONG",
+        "department_columns": ["WRONG"],
+        "scheduler_header_row": 1,
+        "scheduler_day_type_column": "Day-type",
+        "scheduler_department_columns": ["Surgery"],
+    }
+    result = generate_schedule(staff, grid, mapping)
+    assert result[1][2] == "Alice"
+
+
+def test_scheduler_keys_absent_falls_back_to_shared():
+    staff = [{"name": "Alice", "department": "Surgery"}]
+    grid = [
+        ["Date", "Day-type", "Surgery"],
+        ["2026-06-01", "labor", ""],
+    ]
+    mapping = {"header_row": 1, "day_type_column": "Day-type", "department_columns": ["Surgery"]}
+    result = generate_schedule(staff, grid, mapping)
+    assert result[1][2] == "Alice"
+
+
 def test_generate_does_not_mutate_input():
     staff = [{"name": "Alice", "department": "Surgery"}]
     grid = [

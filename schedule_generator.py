@@ -13,9 +13,9 @@ def generate_schedule(
     mapping: dict,
 ) -> list[list]:
     """Returns template_grid copy with staff assigned per department using weighted greedy."""
-    header_idx = mapping["header_row"] - 1
-    day_type_col = mapping["day_type_column"]
-    dept_cols = mapping["department_columns"]
+    header_idx = (mapping.get("scheduler_header_row") or mapping["header_row"]) - 1
+    day_type_col = mapping.get("scheduler_day_type_column") or mapping["day_type_column"]
+    dept_cols = mapping.get("scheduler_department_columns") or mapping["department_columns"]
 
     if not template_grid or len(template_grid) <= header_idx:
         return [list(row) for row in template_grid]

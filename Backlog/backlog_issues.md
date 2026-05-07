@@ -18,3 +18,11 @@ Actual: bot reacts on absolutely any message, not only commands (chat message, a
 ### 005-3 U005-5 help menu for IT admin not verified [Risk, deferred]
 
 U005-5 (verify `/setrole` appears in `/help` for IT role) was skipped during UAT. Deferred — to be tested when IT admin role is exercised in S006d or later.
+
+### 006b-01 `--health` does not check Google Sheets connectivity [P1, S006c+]
+
+`--health` passes even when Google Sheets credentials are invalid or the sheet is unreachable. A misconfigured service account or wrong `GOOGLE_SHEET_ID` goes undetected until `/draft` fails at runtime. Health check should include a Google Sheets connectivity probe.
+
+### 006b-02 Webhook handler does not log each incoming request attempt [P2, S006c+]
+
+Only errors are logged to `webhook.log`. Each incoming Telegram update is not recorded, making silent failures (bot receives message but does nothing) invisible to IT without manual debugging.

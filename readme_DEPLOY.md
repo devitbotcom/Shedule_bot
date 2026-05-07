@@ -147,20 +147,20 @@ If the output shows `⚠️ Auto-install failed`, copy the printed entries manua
 All commands follow this pattern — activate the venv first:
 
 ```bash
-cd ~/Shedule_bot && source venv/bin/activate && 
+cd ~/Shedule_bot && source venv/bin/activate && python3 main.py --health 
 ```
 and then 
 
-| Task                | Command                                                  |
-|---------------------|----------------------------------------------------------|
-| Health check        | `python main.py --health`                                |
-| Preview shifts      | `python main.py --dry-run`                               |
-| Send notifications  | `python main.py --production`                            |
-| Resend one person   | `python main.py --production --employee "Name"`          |
-| Force resend all    | `python main.py --production --force`                    |
-| Clear dedup records | `python main.py --reload-schedule`                       |
-| Send one shift type | `python main.py --production --shift-type labor`         |
-| Regenerate cron entries | `TZ=Europe/Kyiv python main.py --gen-crontab`        |
+| Task                    | Command                                                   |
+|-------------------------|-----------------------------------------------------------|
+| Health check            | ` main.py --health`                                       |
+| Preview shifts          | ` main.py --dry-run`                                      |
+| Send notifications      | ` main.py --production`                                   |
+| Resend one person       | ` main.py --production --employee "Name"`                 |
+| Force resend all        | ` main.py --production --force`                           |
+| Clear dedup records     | ` main.py --reload-schedule`                              |
+| Send one shift type     | ` main.py --production --shift-type labor`                |
+| Regenerate cron entries | `TZ=Europe/Kyiv python main.py --gen-crontab`             |
 
 ### P9b. Managing cPanel cron entries
 

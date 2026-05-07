@@ -101,19 +101,26 @@ GOOGLE_SERVICE_ACCOUNT_JSON=/home/<your cPanel username>/Shedule_bot/data/servic
 
 ## Step 6 — Confirm tab names in schedule_mapping.json
 
-Open `~/Shedule_bot/data/schedule_mapping.json` and confirm these keys match the actual tab names in your Google Sheet:
+Open `~/Shedule_bot/data/schedule_mapping.json` and confirm these keys match your Google Sheet:
 
 ```json
 {
-  "scheduler_staff_tab":    "Staff",
-  "scheduler_schedule_tab": "Draft",
-  "scheduler_output_tab":   "Draft-by-bot",
-  "scheduler_month_cell":   "A1",
-  "scheduler_year_cell":    "B1"
+  "scheduler_staff_tab":          "Staff",
+  "scheduler_schedule_tab":       "Draft",
+  "scheduler_output_tab":         "Draft-by-bot",
+  "scheduler_month_cell":         "A1",
+  "scheduler_year_cell":          "B1",
+  "scheduler_header_row":         2,
+  "scheduler_day_type_column":    "Day-type",
+  "scheduler_department_columns": ["Приймальне відділення", "..."]
 }
 ```
 
-If your tabs have different names, update the values here.
+- `scheduler_header_row` — row number (1-indexed) where column headers appear in the Draft tab
+- `scheduler_day_type_column` — header of the day-type column in the Draft tab
+- `scheduler_department_columns` — list of department column headers in the Draft tab (must match exactly, case-sensitive)
+
+These three keys are independent from `header_row` / `day_type_column` / `department_columns` used by the notification pipeline.
 
 ---
 
