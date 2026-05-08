@@ -119,12 +119,11 @@ def validate_draft_grid(
             if day_numbers != expected_seq:
                 for pos, (actual, exp) in enumerate(zip(day_numbers, expected_seq), start=1):
                     if actual != exp:
+                        prev = day_numbers[pos - 2]
                         warnings.append(
-                            f"Порядок днів порушено: позиція {pos} — очікувалось {exp}, знайдено {actual}"
+                            f"Порядок днів порушено: після дня {prev} очікувався день {exp}, знайдено {actual}"
                         )
                         break
-                else:
-                    warnings.append("Порядок днів порушено: кількість днів не збігається")
     except Exception:
         pass
 

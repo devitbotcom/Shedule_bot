@@ -23,7 +23,8 @@
 
 | File | Tests | Notes |
 |---|---|---|
-| `tests/test_schedule_validator.py` | 13 | All 7 checks + boundary + contract — ✅ in scope |
+| `tests/test_schedule_validator.py` | 18 | All 7 checks + boundary + contract + UAT fixes — ✅ in scope |
+| `tests/test_cmd_draft.py` | 7 | Happy path, error paths, warning-in-tab — ✅ in scope |
 
 ---
 
@@ -44,6 +45,11 @@
 | 10 | `test_v7_empty_name_warns` | V7 | Negative |
 | 11 | `test_v7_invalid_chars_warns` | V7 | Negative |
 | 12 | `test_v7_ukrainian_name_no_warning` | V7 | Regression (no false positive) |
+| 13a | `test_v6b_weekday_marked_holiday_warns` | V6b | Negative (UAT 06b2-1) |
+| 13b | `test_v6b_weekday_marked_labour_no_warning` | V6b | Regression (no false positive) |
+| 14a | `test_missing_date_column_warns` | column diagnostic | Negative (UAT 06b2-3) |
+| 14b | `test_missing_day_type_column_warns` | column diagnostic | Negative (UAT 06b2-3) |
+| 15 | `test_v2_fires_when_cell_is_none` | V2 + `_cell()` | Regression (UAT 06b2-3 root cause) |
 
 ---
 
@@ -76,22 +82,21 @@
 |---|---|---|
 | 06b2-3 CRITICAL — V2 not firing on empty cell | `_cell()` helper prevents `str(None)="None"`; column-not-found diagnostic added | T14, T15 |
 | 06b2-1 — Mon-Fri not checked for holiday | V6b added: weekday marked `holiday` warns with Ukrainian name | T13a, T13b |
-| 06b2-2 part 1 — V5 message too vague | First out-of-order position shown explicitly | T6 updated |
+| 06b2-2 part 1 (round 1) — V5 message too vague | Showed "позиція {pos}" — Owner rejected: internal number, not visible in sheet | T6 updated (rejected) |
+| 06b2-2 part 1 (round 2) — V5 message still unreadable | Message changed to "після дня {prev} очікувався день {exp}, знайдено {actual}" — actual day numbers visible in spreadsheet | T6 re-asserts against day numbers |
 | 06b2-2 part 2 — warnings not in tab | Warning block appended to `filled_grid` before write | `test_cmd_draft_warnings_appended_to_grid` |
 
-**Suite after fixes: 162/162 passing.**
+**Suite after all fixes: 162/162 passing.**
 
-**Post-UAT finding:**
+**Post-UAT findings:**
 
 | ID | Severity | Location | Description |
 |---|---|---|---|
-| F3 | 🔵 Low | `schedule_validator.py:126` | V5 `for…else` dead code — `else` never fires since `expected_seq` is same length as `day_numbers`. Harmless. |
+| F3 | 🔵 Low | `schedule_validator.py` | V5 `for…else` dead code — `else` never fires since `expected_seq` is same length as `day_numbers`. **Fixed — `else` branch removed 2026-05-08.** |
 
 ## Overall verdict
 
-**✅ ACCEPTED — UAT findings resolved. F1 fixed, F2/F3 deferred. 162/162 passing. Zero regressions.**
-
-**UAT doc:** to be created.
+**✅ ACCEPTED — all UAT findings resolved. F1/F3 fixed, F2 deferred. 162/162 passing. Zero regressions.**
 
 ---
 
@@ -100,6 +105,6 @@
 | Role | Date | Status |
 |---|---|---|
 | Architect | 2026-05-07 | ✅ |
-| Developer | 2026-05-07 | ✅ |
-| QA | 2026-05-08 | ✅ UAT findings resolved; F1/F2/F3 deferred — UAT re-run pending |
-| Owner | — | ⏸ UAT pending |
+| Developer | 2026-05-08 | ✅ |
+| QA | 2026-05-08 | ✅ All UAT findings verified resolved; F2 deferred |
+| Owner | — | ⏸ UAT re-run pending |
