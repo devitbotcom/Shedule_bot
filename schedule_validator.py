@@ -72,6 +72,39 @@ def validate_draft_grid(
     except Exception:
         pass
 
+    # V8 — same day in both preferred and undesired lists (per person)
+    try:
+        for s in staff_list:
+            name = s.get("name", "")
+            conflict_days = sorted(
+                set(s.get("preferred_days", [])) & set(s.get("undesired_days", []))
+            )
+            for day in conflict_days:
+                warnings.append(
+                    f"[Персонал] '{name}' — день {day} вказано і в бажаних, і в небажаних датах — день пропущено"
+                )
+    except Exception:
+        pass
+
+    # V9 — out-of-range day numbers in preference lists (requires year_int)
+    if year_int is not None:
+        try:
+            max_day = calendar.monthrange(year_int, month_int)[1]
+            for s in staff_list:
+                name = s.get("name", "")
+                for day in s.get("preferred_days", []):
+                    if not (1 <= day <= max_day):
+                        warnings.append(
+                            f"[Персонал] '{name}' — бажаний день {day} не існує у місяці — запис проігноровано"
+                        )
+                for day in s.get("undesired_days", []):
+                    if not (1 <= day <= max_day):
+                        warnings.append(
+                            f"[Персонал] '{name}' — небажаний день {day} не існує у місяці — запис проігноровано"
+                        )
+        except Exception:
+            pass
+
     # Collect day numbers and per-row issues for V2, V3, V4, V5
     # C4: skip entire loop when date column is missing to prevent V3 cascade noise
     day_numbers: list[int] = []

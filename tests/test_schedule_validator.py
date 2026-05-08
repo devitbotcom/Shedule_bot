@@ -279,3 +279,84 @@ def test_c4_missing_date_column_no_v3_cascade():
     warnings = validate_draft_grid(grid, mapping, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
     assert any("[Налаштування]" in w for w in warnings)
     assert not any("[Структура]" in w and "рядків без номера" in w for w in warnings)
+
+
+# ---------------------------------------------------------------------------
+# V8 — same day in both preferred and undesired (per person)
+# ---------------------------------------------------------------------------
+
+def test_v8_conflict_warns():
+    staff = [{"name": "Тест", "department": "Surgery",
+              "preferred_days": [5], "undesired_days": [5]}]
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
+    assert any("[Персонал]" in w and "день 5" in w and "бажаних, і в небажаних" in w for w in warnings)
+
+
+def test_v8_no_conflict_no_warning():
+    staff = [{"name": "Тест", "department": "Surgery",
+              "preferred_days": [1], "undesired_days": [2]}]
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
+    assert not any("бажаних, і в небажаних" in w for w in warnings)
+
+
+def test_v8_multiple_conflict_days_all_warned():
+    staff = [{"name": "Тест", "department": "Surgery",
+              "preferred_days": [3, 7], "undesired_days": [3, 7]}]
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
+    assert any("день 3" in w and "бажаних, і в небажаних" in w for w in warnings)
+    assert any("день 7" in w and "бажаних, і в небажаних" in w for w in warnings)
+
+
+# ---------------------------------------------------------------------------
+# V9 — out-of-range day number in preference lists
+# ---------------------------------------------------------------------------
+
+def test_v9_preferred_out_of_range_warns():
+    staff = [{"name": "Тест", "department": "Surgery",
+              "preferred_days": [32], "undesired_days": []}]
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
+    assert any("[Персонал]" in w and "бажаний день 32" in w for w in warnings)
+
+
+def test_v9_undesired_out_of_range_warns():
+    staff = [{"name": "Тест", "department": "Surgery",
+              "preferred_days": [], "undesired_days": [32]}]
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
+    assert any("[Персонал]" in w and "небажаний день 32" in w for w in warnings)
+
+
+def test_v9_valid_day_no_warning():
+    staff = [{"name": "Тест", "department": "Surgery",
+              "preferred_days": [30], "undesired_days": []}]
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
+    assert not any("не існує у місяці" in w for w in warnings)
+
+
+def test_v9_zero_preferred_warns():
+    staff = [{"name": "Тест", "department": "Surgery",
+              "preferred_days": [0], "undesired_days": []}]
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
+    assert any("[Персонал]" in w and "бажаний день 0" in w for w in warnings)
+
+
+def test_v9_negative_undesired_warns():
+    staff = [{"name": "Тест", "department": "Surgery",
+              "preferred_days": [], "undesired_days": [-1]}]
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
+    assert any("[Персонал]" in w and "небажаний день -1" in w for w in warnings)
+
+
+def test_v9_skipped_when_year_none():
+    staff = [{"name": "Тест", "department": "Surgery",
+              "preferred_days": [32], "undesired_days": []}]
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, None)
+    assert not any("не існує у місяці" in w for w in warnings)

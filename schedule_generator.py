@@ -80,15 +80,33 @@ def generate_schedule(
             else:
                 eligible = candidates
 
+            # V8 exclusion: remove candidates with day_number in both preferred and undesired
+            if day_number is not None:
+                eligible = [s for s in eligible
+                            if not (day_number in s.get("preferred_days", [])
+                                    and day_number in s.get("undesired_days", []))]
+                if not eligible:
+                    generation_warnings.append(
+                        f"[День {day_number}] відділення '{dept}' — конфлікт переваг, слот залишено порожнім"
+                    )
+                    continue
+
             # C8: three-tier preference selection on eligible candidates
             if day_number is not None:
-                preferred_names = {s["name"] for s in eligible if day_number in s.get("preferred_days", [])}
-                undesired_names = {s["name"] for s in eligible if day_number in s.get("undesired_days", [])}
-                preferred = [s for s in eligible if s["name"] in preferred_names]
-                neutral = [s for s in eligible
-                           if s["name"] not in preferred_names and s["name"] not in undesired_names]
-                undesired = [s for s in eligible
-                             if s["name"] in undesired_names and s["name"] not in preferred_names]
+                # V10: if all eligible candidates prefer this day, skip preference tiers
+                if all(day_number in s.get("preferred_days", []) for s in eligible):
+                    generation_warnings.append(
+                        f"[Персонал] '{dept}' — день {day_number} бажаний для всіх лікарів відділення, перевага не застосовується"
+                    )
+                    preferred, neutral, undesired = [], eligible, []
+                else:
+                    preferred_names = {s["name"] for s in eligible if day_number in s.get("preferred_days", [])}
+                    undesired_names = {s["name"] for s in eligible if day_number in s.get("undesired_days", [])}
+                    preferred = [s for s in eligible if s["name"] in preferred_names]
+                    neutral = [s for s in eligible
+                               if s["name"] not in preferred_names and s["name"] not in undesired_names]
+                    undesired = [s for s in eligible
+                                 if s["name"] in undesired_names and s["name"] not in preferred_names]
             else:
                 preferred, neutral, undesired = [], eligible, []
 

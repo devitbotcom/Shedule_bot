@@ -276,3 +276,74 @@ def test_c9_returns_tuple():
     """generate_schedule always returns a (grid, warnings) tuple."""
     output = generate_schedule([], [], _MAPPING)
     assert isinstance(output, tuple) and len(output) == 2
+
+
+# ---------------------------------------------------------------------------
+# V8 — inline exclusion of candidates with conflicting preference for a day
+# ---------------------------------------------------------------------------
+
+def test_v8_conflicted_person_not_assigned_on_conflict_day():
+    """Alice has day 1 in both lists → excluded; Bob assigned instead."""
+    staff = [
+        {"name": "Alice", "department": "Surgery", "preferred_days": [1], "undesired_days": [1]},
+        {"name": "Bob",   "department": "Surgery", "preferred_days": [],  "undesired_days": []},
+    ]
+    grid = [["Day", "Day-type", "Surgery"], ["1", "labour", ""]]
+    result, _ = generate_schedule(staff, grid, _PREF_MAPPING)
+    assert result[1][2] == "Bob"
+
+
+def test_v8_conflicted_person_assigned_on_other_days():
+    """Alice is V8-conflicted only on day 1; assigned normally on day 2."""
+    staff = [
+        {"name": "Alice", "department": "Surgery", "preferred_days": [1], "undesired_days": [1]},
+        {"name": "Bob",   "department": "Surgery", "preferred_days": [],  "undesired_days": []},
+    ]
+    grid = [
+        ["Day", "Day-type", "Surgery"],
+        ["1", "labour", ""],
+        ["2", "labour", ""],
+    ]
+    result, _ = generate_schedule(staff, grid, _PREF_MAPPING)
+    assert result[1][2] == "Bob"     # Alice excluded on day 1
+    assert result[2][2] != ""        # both eligible on day 2; slot filled
+
+
+def test_v8_all_excluded_slot_empty_with_warning():
+    """Only Alice in dept; V8 conflict on day 1 → slot left empty + warning."""
+    staff = [
+        {"name": "Alice", "department": "Surgery", "preferred_days": [1], "undesired_days": [1]},
+    ]
+    grid = [["Day", "Day-type", "Surgery"], ["1", "labour", ""]]
+    result, warnings = generate_schedule(staff, grid, _PREF_MAPPING)
+    assert result[1][2] == ""
+    assert any("[День 1]" in w and "конфлікт переваг" in w for w in warnings)
+
+
+# ---------------------------------------------------------------------------
+# V10 — skip preference tiers when all eligible candidates prefer the same day
+# ---------------------------------------------------------------------------
+
+def test_v10_all_prefer_same_day_slot_still_filled():
+    """All staff prefer day 1 → V10 warning, preference skipped, slot still filled."""
+    staff = [
+        {"name": "Alice", "department": "Surgery", "preferred_days": [1], "undesired_days": []},
+        {"name": "Bob",   "department": "Surgery", "preferred_days": [1], "undesired_days": []},
+    ]
+    grid = [["Day", "Day-type", "Surgery"], ["1", "labour", ""]]
+    result, warnings = generate_schedule(staff, grid, _PREF_MAPPING)
+    assert result[1][2] in ("Alice", "Bob")
+    assert any("[Персонал]" in w and "Surgery" in w and "день 1" in w
+               and "перевага не застосовується" in w for w in warnings)
+
+
+def test_v10_not_all_prefer_same_day_no_false_positive():
+    """Only Alice prefers day 1 (Bob neutral) → no V10 warning; Alice assigned."""
+    staff = [
+        {"name": "Alice", "department": "Surgery", "preferred_days": [1], "undesired_days": []},
+        {"name": "Bob",   "department": "Surgery", "preferred_days": [],  "undesired_days": []},
+    ]
+    grid = [["Day", "Day-type", "Surgery"], ["1", "labour", ""]]
+    result, warnings = generate_schedule(staff, grid, _PREF_MAPPING)
+    assert result[1][2] == "Alice"
+    assert not any("перевага не застосовується" in w for w in warnings)

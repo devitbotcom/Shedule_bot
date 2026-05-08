@@ -237,11 +237,35 @@ Owner decision (OQ-6): if all candidates for a slot worked the previous calendar
 
 ---
 
+## Deferred to S006d
+
+Raised during S006c UAT (finding 06c-03). Owner confirmed rule: **detect invalid/conflicting preference entry → exclude that person from assignment on the affected day → warn Head.** Three new validator checks on the staff list:
+
+### V8 — Same day in both preferred and undesired (per person)
+**Condition:** `day ∈ preferred_days AND day ∈ undesired_days` for the same person.  
+**Action:** exclude that person from assignment on that day; treat as if the day is absent from both lists.  
+**Warning:** `[Персонал] '<name>' — день <N> вказано і в бажаних, і в небажаних датах — день пропущено`
+
+### V9 — Day number out of valid range
+**Condition:** any integer in `preferred_days` or `undesired_days` that exceeds the actual month length.  
+**Action:** drop the out-of-range entry; it can never match a real row.  
+**Warning:** `[Персонал] '<name>' — бажаний день <N> не існує у місяці — запис проігноровано`  
+*(same format for undesired)*
+
+### V10 — All staff in a department share the same preferred day
+**Condition:** every candidate for a given department has the same day in their `preferred_days`.  
+**Action:** skip preference logic for that day in that department (all candidates treated as neutral).  
+**Warning:** `[Персонал] <dept> — день <N> бажаний для всіх лікарів відділення, перевага не застосовується`
+
+**Implementation note:** V8 and V9 run on the staff list before generation (same phase as V1/V7). V10 runs per department per day during generation. Owner decision recorded 2026-05-08.
+
+---
+
 ## Sign-off
 
 | Role      | Date       | Status                                              |
 |-----------|------------|-----------------------------------------------------|
-| Architect | 2026-05-08 | ✅ ARCH accepted; UAT patch P1–P3 designed 2026-05-08 |
-| Developer | —          | ⏸ Pending patch implementation                      |
-| QA        | —          | ⏸                                                   |
-| Owner     | —          | ⏸ UAT in progress — U006c-1 ✅, U006c-5 ✅, U006c-6 ✅; U006c-2/3/4 reopened |
+| Architect | 2026-05-08 | ✅ ARCH accepted; UAT patch P1–P3 designed; V8/V9/V10 recorded for S006d |
+| Developer | 2026-05-08 | ✅ P1–P3 implemented; 187/187 tests pass             |
+| QA        | 2026-05-08 | ✅ 187/187 tests pass; all 19 ARCH test cases covered |
+| Owner     | —          | ⏸ UAT re-test pending — U006c-2/3/4 IN RE-TEST      |

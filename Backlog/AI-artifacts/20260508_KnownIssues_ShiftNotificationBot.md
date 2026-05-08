@@ -36,45 +36,36 @@ Only errors are written to `webhook.log`. Each incoming Telegram update is not r
 
 ---
 
-### KI-003 — Invalid year silently skips all validation
-**Severity:** 🟡 Low
-**Source:** backlog 006b2-01 / QA finding F2
-**Planned:** S007+
+### KI-011 — V8: same day in both preferred and undesired lists (per person)
+**Severity:** 🟠 P2
+**Source:** UAT finding 06c-03 / Owner decision 2026-05-08
+**Planned:** S006d
 
-In `bot_hook._cmd_draft`, if `year_str` cannot be parsed as integer, `year_int = None` and the entire `validate_draft_grid` call is skipped with no feedback to Head. Checks V1, V2, V3, V5, V7 do not require `year_int` and could still run.
+If a staff member has the same day number in both `preferred_days` and `undesired_days`, the entry is contradictory. Current behaviour: preferred tier silently wins. Expected behaviour: exclude that person from assignment on that day; warn Head.
 
----
-
-### KI-004 — V6 inner `except` does not cover `TypeError`
-**Severity:** 🟡 Low
-**Source:** QA logic review 2026-05-08
-**Planned:** S007+
-
-`except (ValueError, OverflowError)` in the V6/V6b loop does not catch `TypeError`. If `year_int=None` reaches `date(None, month_int, day_int)`, `TypeError` escapes the inner catch, hits the outer `except Exception: pass`, and silently aborts all remaining V6/V6b checks for that call. Production is safe — `bot_hook` guards with `if year_int is not None` — but any direct caller (test or future integration) with `year_int=None` gets silent V6 suppression. Related to KI-003.
-
-**Fix:** add `TypeError` to the inner `except` clause, or document `year_int` as required non-None in the function signature.
+**Design:** see S006c ARCH §Deferred to S006d — V8.
 
 ---
 
-### KI-005 — V3 cascades when date column is missing
-**Severity:** 🟡 Low
-**Source:** QA logic review 2026-05-08
-**Planned:** backlog / cosmetic
+### KI-012 — V9: day number out of valid range in preference lists
+**Severity:** 🟠 P2
+**Source:** UAT finding 06c-03 / Owner decision 2026-05-08
+**Planned:** S006d
 
-When `[Налаштування]` fires for a missing date column, `_cell(row, None)` returns `""` for every data row. V3 also fires: `[Структура] N рядків без номера дня`. Head receives two warnings for a single config problem. The `[Налаштування]` tag makes the root cause clear, but V3 is noise in this scenario.
+Day numbers outside the valid range `1…month_length` (including 0, negatives, and over-length values such as 32) in `preferred_days` or `undesired_days` indicate a data-entry error. Zero and negatives pass through `_parse_days` as valid integers. No warning is currently issued for any of these cases.
 
-**Fix:** skip V2/V3 collection loop when `day_col_idx is None`.
+**Design:** see S006c ARCH §Deferred to S006d — V9.
 
 ---
 
-### KI-006 — Stale test assertion in `test_v4_leap_year_no_warning`
+### KI-013 — V10: all staff in a department share the same preferred day
 **Severity:** 🟡 Low
-**Source:** QA finding F4 (2026-05-08)
-**Planned:** next Developer pass
+**Source:** UAT finding 06c-03 / Owner decision 2026-05-08
+**Planned:** S006d
 
-`test_v4_leap_year_no_warning` (line 78) asserts `not any("має бути" in w ...)`. The V4 message was updated to use `"очікується"` (AD-S006b2-008); `"має бути"` no longer appears anywhere. Test passes (valid grid produces no V4 warning), but the assertion no longer guards V4 false positives — it checks for text that does not exist.
+When every candidate for a department has the same day in their `preferred_days`, the preference cannot discriminate and the slot outcome is the same as without preferences. Current behaviour: preference logic still runs (one candidate wins the preferred tier). Expected behaviour: skip preference logic for that day in that department, treat all as neutral, warn Head.
 
-**Fix:** change to `not any("[Структура]" in w and "очікується" in w for w in warnings)`.
+**Design:** see S006c ARCH §Deferred to S006d — V10.
 
 ---
 
@@ -126,3 +117,8 @@ U005-5 (verify `/setrole` appears in `/help` for IT role) was skipped during S00
 | 06b2-1 | Mon–Fri not checked for `holiday` day-type | 2026-05-08 |
 | 06b2-2 | V5 message unreadable; warnings not written to tab | 2026-05-08 |
 | 06b-04 | Period in initials rejected by V7 name regex | 2026-05-08 |
+| KI-003 | Invalid year silently skips all validation | S006c C3 |
+| KI-004 | V6 inner `except` does not cover `TypeError` | S006c C3 (`year_int: int \| None`; V6 guarded internally) |
+| KI-005 | V3 cascades when date column is missing | S006c C4 |
+| KI-006 | Stale T5a test assertion (`"має бути"`) | S006c C5 |
+| KI-010 | `/draft` reply has no link to Google Sheet | S006c C2 |
