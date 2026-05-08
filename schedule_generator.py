@@ -81,18 +81,23 @@ def generate_schedule(
                 eligible = candidates
 
             # C8: three-tier preference selection on eligible candidates
-            # Rule: day in both preferred and undesired counts as neither (neutral)
             if day_number is not None:
-                preferred_names = {s["name"] for s in eligible
-                                   if day_number in s.get("preferred_days", [])
-                                   and day_number not in s.get("undesired_days", [])}
-                undesired_names = {s["name"] for s in eligible
-                                   if day_number in s.get("undesired_days", [])
-                                   and day_number not in s.get("preferred_days", [])}
+                # V8: exclude candidates whose preference for this day is self-contradicting
+                eligible = [s for s in eligible
+                            if not (day_number in s.get("preferred_days", [])
+                                    and day_number in s.get("undesired_days", []))]
+                if not eligible:
+                    generation_warnings.append(
+                        f"[Персонал] '{dept}' — день {day_number} конфліктна перевага для всіх лікарів, слот залишено порожнім"
+                    )
+                    continue
+                preferred_names = {s["name"] for s in eligible if day_number in s.get("preferred_days", [])}
+                undesired_names = {s["name"] for s in eligible if day_number in s.get("undesired_days", [])}
                 preferred = [s for s in eligible if s["name"] in preferred_names]
                 neutral = [s for s in eligible
                            if s["name"] not in preferred_names and s["name"] not in undesired_names]
-                undesired = [s for s in eligible if s["name"] in undesired_names]
+                undesired = [s for s in eligible
+                             if s["name"] in undesired_names and s["name"] not in preferred_names]
                 if preferred and len(preferred) == len(eligible):
                     generation_warnings.append(
                         f"[Персонал] '{dept}' — день {day_number} бажаний для всіх лікарів відділення, слот залишено порожнім"

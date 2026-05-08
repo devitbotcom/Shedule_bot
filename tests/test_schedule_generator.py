@@ -283,19 +283,19 @@ def test_c9_returns_tuple():
 # V8 — inline exclusion of candidates with conflicting preference for a day
 # ---------------------------------------------------------------------------
 
-def test_v8_conflicted_day_treated_as_neutral():
-    """Alice has day 1 in both lists → treated as neutral; both Alice and Bob eligible."""
+def test_v8_conflicted_person_excluded_bob_assigned():
+    """Alice has day 1 in both lists → excluded; Bob assigned instead."""
     staff = [
         {"name": "Alice", "department": "Surgery", "preferred_days": [1], "undesired_days": [1]},
         {"name": "Bob",   "department": "Surgery", "preferred_days": [],  "undesired_days": []},
     ]
     grid = [["Day", "Day-type", "Surgery"], ["1", "labour", ""]]
     result, _ = generate_schedule(staff, grid, _PREF_MAPPING)
-    assert result[1][2] in ("Alice", "Bob")
+    assert result[1][2] == "Bob"
 
 
-def test_v8_conflicted_person_assigned_on_conflict_and_other_days():
-    """Alice has day 1 in both lists → neutral on day 1; assigned normally on day 2."""
+def test_v8_conflicted_person_excluded_only_on_conflict_day():
+    """Alice excluded on day 1 (conflict); both eligible on day 2."""
     staff = [
         {"name": "Alice", "department": "Surgery", "preferred_days": [1], "undesired_days": [1]},
         {"name": "Bob",   "department": "Surgery", "preferred_days": [],  "undesired_days": []},
@@ -306,8 +306,19 @@ def test_v8_conflicted_person_assigned_on_conflict_and_other_days():
         ["2", "labour", ""],
     ]
     result, _ = generate_schedule(staff, grid, _PREF_MAPPING)
-    assert result[1][2] in ("Alice", "Bob")  # both eligible on day 1
-    assert result[2][2] != ""                # slot filled on day 2
+    assert result[1][2] == "Bob"   # Alice excluded on day 1
+    assert result[2][2] != ""      # both eligible on day 2
+
+
+def test_v8_all_conflicted_slot_empty_with_warning():
+    """Only Alice in dept; V8 conflict on day 1 → slot empty + warning."""
+    staff = [
+        {"name": "Alice", "department": "Surgery", "preferred_days": [1], "undesired_days": [1]},
+    ]
+    grid = [["Day", "Day-type", "Surgery"], ["1", "labour", ""]]
+    result, warnings = generate_schedule(staff, grid, _PREF_MAPPING)
+    assert result[1][2] == ""
+    assert any("[Персонал]" in w and "конфліктна перевага" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
