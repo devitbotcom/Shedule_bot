@@ -6,6 +6,7 @@ import pytest
 from google_sheets_adapter import (
     STAFF_DEPT_COL,
     STAFF_NAME_COL,
+    _col_letter_to_index,
     get_schedule_grid,
     get_staff_list,
     read_cell,
@@ -24,9 +25,10 @@ def _mock_gc(records=None, values=None):
 
 @patch("google_sheets_adapter.gspread.service_account")
 def test_get_staff_list_returns_name_department_dicts(mock_sa):
-    mock_sa.return_value = _mock_gc(records=[
-        {STAFF_NAME_COL: "Alice", STAFF_DEPT_COL: "Surgery"},
-        {STAFF_NAME_COL: "Bob", STAFF_DEPT_COL: "Anesthesia"},
+    mock_sa.return_value = _mock_gc(values=[
+        [STAFF_NAME_COL, STAFF_DEPT_COL],
+        ["Alice", "Surgery"],
+        ["Bob", "Anesthesia"],
     ])
     result = get_staff_list("sheet-id", "Staff", "/creds.json")
     assert result == [
@@ -37,9 +39,10 @@ def test_get_staff_list_returns_name_department_dicts(mock_sa):
 
 @patch("google_sheets_adapter.gspread.service_account")
 def test_get_staff_list_skips_rows_with_empty_name(mock_sa):
-    mock_sa.return_value = _mock_gc(records=[
-        {STAFF_NAME_COL: "Alice", STAFF_DEPT_COL: "Surgery"},
-        {STAFF_NAME_COL: "", STAFF_DEPT_COL: ""},
+    mock_sa.return_value = _mock_gc(values=[
+        [STAFF_NAME_COL, STAFF_DEPT_COL],
+        ["Alice", "Surgery"],
+        ["", ""],
     ])
     result = get_staff_list("sheet-id", "Staff", "/creds.json")
     assert len(result) == 1
@@ -47,55 +50,87 @@ def test_get_staff_list_skips_rows_with_empty_name(mock_sa):
 
 
 # ---------------------------------------------------------------------------
-# C7 — preference columns
+# _col_letter_to_index helper
+# ---------------------------------------------------------------------------
+
+def test_col_letter_to_index_single():
+    assert _col_letter_to_index("A") == 0
+    assert _col_letter_to_index("B") == 1
+    assert _col_letter_to_index("C") == 2
+    assert _col_letter_to_index("Z") == 25
+
+
+def test_col_letter_to_index_double():
+    assert _col_letter_to_index("AA") == 26
+    assert _col_letter_to_index("AB") == 27
+
+
+def test_col_letter_to_index_lowercase():
+    assert _col_letter_to_index("a") == 0
+    assert _col_letter_to_index("c") == 2
+
+
+def test_col_letter_to_index_a1_notation():
+    assert _col_letter_to_index("A1") == 0
+    assert _col_letter_to_index("C1") == 2
+    assert _col_letter_to_index("D1") == 3
+    assert _col_letter_to_index("AA1") == 26
+
+
+# ---------------------------------------------------------------------------
+# C7 — preference columns (column-letter addressing)
 # ---------------------------------------------------------------------------
 
 @patch("google_sheets_adapter.gspread.service_account")
 def test_get_staff_list_parses_preferred_days(mock_sa):
-    mock_sa.return_value = _mock_gc(records=[
-        {STAFF_NAME_COL: "Alice", STAFF_DEPT_COL: "Surgery", "preferred_dates": "1, 5, 15"},
+    mock_sa.return_value = _mock_gc(values=[
+        [STAFF_NAME_COL, STAFF_DEPT_COL, "preferred"],
+        ["Alice", "Surgery", "1, 5, 15"],
     ])
-    result = get_staff_list("sheet-id", "Staff", "/creds.json", preferred_col="preferred_dates")
+    result = get_staff_list("sheet-id", "Staff", "/creds.json", preferred_col="C1")
     assert result[0]["preferred_days"] == [1, 5, 15]
     assert result[0]["undesired_days"] == []
 
 
 @patch("google_sheets_adapter.gspread.service_account")
 def test_get_staff_list_parses_undesired_days(mock_sa):
-    mock_sa.return_value = _mock_gc(records=[
-        {STAFF_NAME_COL: "Alice", STAFF_DEPT_COL: "Surgery", "undesired_dates": "10, 20"},
+    mock_sa.return_value = _mock_gc(values=[
+        [STAFF_NAME_COL, STAFF_DEPT_COL, "", "undesired"],
+        ["Alice", "Surgery", "", "10, 20"],
     ])
-    result = get_staff_list("sheet-id", "Staff", "/creds.json", undesired_col="undesired_dates")
+    result = get_staff_list("sheet-id", "Staff", "/creds.json", undesired_col="D1")
     assert result[0]["undesired_days"] == [10, 20]
     assert result[0]["preferred_days"] == []
 
 
 @patch("google_sheets_adapter.gspread.service_account")
 def test_get_staff_list_missing_preference_column_returns_empty_lists(mock_sa):
-    mock_sa.return_value = _mock_gc(records=[
-        {STAFF_NAME_COL: "Alice", STAFF_DEPT_COL: "Surgery"},
+    # Row only has 2 columns; C (idx 2) and D (idx 3) are out of range → empty lists
+    mock_sa.return_value = _mock_gc(values=[
+        [STAFF_NAME_COL, STAFF_DEPT_COL],
+        ["Alice", "Surgery"],
     ])
     result = get_staff_list("sheet-id", "Staff", "/creds.json",
-                            preferred_col="preferred_dates", undesired_col="undesired_dates")
+                            preferred_col="C1", undesired_col="D1")
     assert result[0]["preferred_days"] == []
     assert result[0]["undesired_days"] == []
 
 
 @patch("google_sheets_adapter.gspread.service_account")
 def test_get_staff_list_empty_preference_cell_returns_empty_lists(mock_sa):
-    mock_sa.return_value = _mock_gc(records=[
-        {STAFF_NAME_COL: "Alice", STAFF_DEPT_COL: "Surgery",
-         "preferred_dates": "", "undesired_dates": ""},
+    mock_sa.return_value = _mock_gc(values=[
+        [STAFF_NAME_COL, STAFF_DEPT_COL, "", ""],
+        ["Alice", "Surgery", "", ""],
     ])
     result = get_staff_list("sheet-id", "Staff", "/creds.json",
-                            preferred_col="preferred_dates", undesired_col="undesired_dates")
+                            preferred_col="C1", undesired_col="D1")
     assert result[0]["preferred_days"] == []
     assert result[0]["undesired_days"] == []
 
 
 @patch("google_sheets_adapter.gspread.service_account")
 def test_get_staff_list_empty_sheet(mock_sa):
-    mock_sa.return_value = _mock_gc(records=[])
+    mock_sa.return_value = _mock_gc(values=[])
     assert get_staff_list("sheet-id", "Staff", "/creds.json") == []
 
 
