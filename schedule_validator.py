@@ -2,7 +2,7 @@ import calendar
 import re
 from datetime import date
 
-_NAME_RE = re.compile(r'^[\w\s\-\']+$', re.UNICODE)
+_NAME_RE = re.compile(r'^(?!.*\.{2})[\w\s\-\'\.]+$', re.UNICODE)
 _WEEKDAY_UA = {
     0: "понеділок", 1: "вівторок", 2: "середа",
     3: "четвер", 4: "п'ятниця", 5: "субота", 6: "неділя",

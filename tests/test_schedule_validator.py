@@ -217,3 +217,17 @@ def test_v7_ukrainian_name_no_warning():
     grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
     warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
     assert not any("[Персонал]" in w for w in warnings)
+
+
+def test_v7_name_with_initials_no_warning():
+    staff = [{"name": "Апкепон П. Е.", "department": "Surgery"}]
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
+    assert not any("[Персонал]" in w for w in warnings)
+
+
+def test_v7_double_dot_warns():
+    staff = [{"name": "King D..", "department": "Surgery"}]
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
+    assert any("[Персонал]" in w and "недопустимі символи" in w for w in warnings)

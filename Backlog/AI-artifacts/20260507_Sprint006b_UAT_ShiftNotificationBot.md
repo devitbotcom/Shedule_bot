@@ -257,7 +257,13 @@ Expected:
 ✅ Чернетку розкладу на квітень 2026 записано у вкладку 'Draft-by-bot'. <LINK TO NEW TAB IN GOOGLE SHEET>
 
 
-
+### 06b-04 CR- . should be acceptable 
+Actual
+```message
+• [Персонал] лікар 'Апкепон П. Е.' — недопустимі символи в імені
+```
+Expected:
+. in initials should be acceptable, but not more than. in a row eg: "King D.." is not good.
 
 ---
 
