@@ -81,7 +81,7 @@ def validate_draft_grid(
             )
             for day in conflict_days:
                 warnings.append(
-                    f"[Персонал] '{name}' — день {day} вказано і в бажаних, і в небажаних датах — день пропущено"
+                    f"[Персонал] '{name}' — день {day} вказано і в бажаних, і в небажаних датах — перевагу скасовано"
                 )
     except Exception:
         pass

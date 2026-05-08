@@ -224,3 +224,10 @@ Actual:
 
 Expected: 
 User friendly warning. Distribute only for nonconflicting dates.
+
+The solution is owerfit, 
+WHY SO COMPLEX!?
+- Just skip a day that in conflict DO NOT make desisions for user
+e.g. • [Персонал] 'Анестезіологія' — день 1 бажаний для всіх лікарів відділення, перевага не застосовується
+  • [Персонал] 'Третій Л. А.' — день 22 вказано і в бажаних, і в небажаних датах — день пропущено
+it should just keep days blank!
