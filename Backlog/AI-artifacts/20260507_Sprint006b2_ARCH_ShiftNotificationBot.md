@@ -26,15 +26,21 @@ When Head runs `/draft`, the bot validates the Draft tab content and appends non
 
 ## Checks
 
+**Updated 2026-05-08 — unified message format (see AD-S006b2-008)**
+
 | # | Check | Condition | Warning text (Ukrainian) |
 |---|---|---|---|
-| V1 | Empty staff per department | `scheduler_department_columns` entry has 0 staff in Staff tab | `Відділення "<name>": немає лікарів — стовпець буде порожнім` |
-| V2 | Empty day-type cells | Row has day number but day_type cell is empty | `N днів мають номер, але тип дня не заповнено — їх буде пропущено` |
-| V3 | Empty day-of-month | Row after header has empty day cell | `N рядків без номера дня` |
-| V4 | Day count vs calendar | Rows with day numbers ≠ `calendar.monthrange(year, month)[1]` | `Заповнено N днів, у <місяць> <рік> має бути M` |
-| V5 | Days not in order | Day numbers not incrementing sequentially from 1 | `Дні йдуть не по порядку або є пропуски` |
-| V6 | Sat/Sun not holiday | `date(year, month, day).weekday() >= 5` and `day_type != 'holiday'` | `День N (<weekday>) позначено як '<day_type>', а не 'holiday'` |
-| V7 | Staff name invalid | Name empty after trim, or does not match `[\w\s\-\']+` (Unicode) | `Лікар: '<name>' — порожнє або містить недопустимі символи` |
+| col | Column not found (date) | `date_col` absent from header row | `[Налаштування] стовпець 'X' не знайдено в заголовку — перевірте scheduler_date_column` |
+| col | Column not found (day-type) | `day_type_col` absent from header row | `[Налаштування] стовпець типу дня 'X' не знайдено — перевірте scheduler_day_type_column` |
+| V1 | Empty staff per department | `scheduler_department_columns` entry has 0 staff in Staff tab | `[Персонал] відділення 'X' — немає лікарів, стовпець буде порожнім` |
+| V2 | Empty day-type cells | Row has day number but day_type cell is empty | `[Структура] тип дня не заповнено: дні 5, 12, 20` (aggregated list of day numbers) |
+| V3 | Empty day-of-month | Row after header has empty day cell | `[Структура] N рядків без номера дня` |
+| V4 | Day count vs calendar | Rows with day numbers ≠ `calendar.monthrange(year, month)[1]` | `[Структура] заповнено N днів, очікується M (місяць рік)` |
+| V5 | Days not in order | Day numbers not incrementing sequentially | `[День {actual}] порядок порушено — після дня {prev} очікувався день {exp}` |
+| V6 | Sat/Sun not holiday | `weekday() >= 5` and `day_type != 'holiday'` | `[День N] субота/неділя — тип 'X', очікується 'holiday'` |
+| V6b | Mon–Fri marked holiday | `weekday() < 5` and `day_type == 'holiday'` | `[День N] вівторок/etc — тип 'holiday', очікується 'labour'` |
+| V7 | Staff name empty | Name empty after trim | `[Персонал] лікар '' — порожнє ім'я` |
+| V7 | Staff name invalid chars | Name does not match `[\w\s\-\']+` (Unicode) | `[Персонал] лікар 'X' — недопустимі символи в імені` |
 
 ---
 
@@ -80,6 +86,23 @@ Each warning logged at `WARNING` level before the message is sent.
 
 **AD-S006b2-006 — Integration point in `bot_hook._cmd_draft`**
 `validate_draft_grid` is called after `get_staff_list` and `get_schedule_grid`, before `generate_schedule`. Warnings collected and passed to message builder.
+
+**AD-S006b2-008 — Unified warning message format (2026-05-08)**
+All warning strings use the prefix pattern `[Категорія] message`.
+
+Four categories:
+- `[Налаштування]` — column mapping config problems
+- `[Персонал]` — Staff tab data problems (V1, V7)
+- `[Структура]` — grid shape/count problems (V3, V4) and aggregated data issues (V2)
+- `[День N]` — per-day data problems, N is the day number visible in the spreadsheet (V5, V6, V6b)
+
+`[День N]` tags are the primary navigation aid: the Head can locate the row in the Draft tab by the day number in the Day column.
+
+V2 changes from a counter to an aggregated list: `[Структура] тип дня не заповнено: дні 5, 12, 20`. Implementation: change `missing_day_type` counter to `missing_day_type_days: list[int]`, append `day_int` instead of incrementing, format with `", ".join(...)`.
+
+V7 splits the combined "порожнє або недопустимі символи" into two distinct messages to keep each warning actionable.
+
+No logic changes to any check — format only.
 
 ---
 
@@ -145,7 +168,7 @@ None — all inputs confirmed by Owner 2026-05-07.
 
 | Role | Date | Status |
 |---|---|---|
-| Architect | 2026-05-07 | ✅ V7 + trim AD added 2026-05-07; F1 accepted |
+| Architect | 2026-05-08 | ✅ AD-S006b2-008 added — unified message format; ready for Developer |
 | Developer | — | ⏸ |
-| QA | 2026-05-08 | ✅ F1 fixed; F2 deferred |
+| QA | — | ⏸ |
 | Owner | — | ⏸ UAT pending |

@@ -45,7 +45,7 @@ def test_no_warnings_valid_grid():
 def test_v1_empty_staff():
     grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
     warnings = validate_draft_grid(grid, _MAPPING, [], _JUNE_MONTH, _JUNE_YEAR)
-    assert any("Surgery" in w for w in warnings)
+    assert any("[Персонал]" in w and "Surgery" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -55,7 +55,7 @@ def test_v1_empty_staff():
 def test_v2_missing_day_type():
     grid = [["Day", "Day-type", "Surgery"], ["5", "", ""]]
     warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
-    assert any("пропущено" in w for w in warnings)
+    assert any("[Структура]" in w and "5" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ def test_v2_missing_day_type():
 def test_v3_empty_day_cell():
     grid = [["Day", "Day-type", "Surgery"], ["", "labour", ""]]
     warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
-    assert any("рядків без номера" in w for w in warnings)
+    assert any("[Структура]" in w and "рядків без номера" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ def test_v4_leap_year_no_warning():
 def test_v4_non_leap_year_warns():
     grid = _make_clean_grid(2, 2028)   # 29 rows — but we tell validator it's 2029
     warnings = validate_draft_grid(grid, _MAPPING, _STAFF, 2, 2029)
-    assert any("29" in w and "28" in w for w in warnings)
+    assert any("[Структура]" in w and "29" in w and "28" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ def test_v5_days_out_of_order():
         ["2", "labour", ""],
     ]
     warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
-    assert any("порушено" in w and "2" in w and "3" in w for w in warnings)
+    assert any("[День 3]" in w and "порушено" in w and "2" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ def test_v5_days_out_of_order():
 def test_v6_saturday_marked_labour():
     grid = [["Day", "Day-type", "Surgery"], ["6", "labour", ""]]  # June 6 = Saturday
     warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
-    assert any("6" in w and "субота" in w for w in warnings)
+    assert any("[День 6]" in w and "субота" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ def test_v6_saturday_marked_labour():
 def test_v6_saturday_marked_holiday_no_warning():
     grid = [["Day", "Day-type", "Surgery"], ["6", "holiday", ""]]  # June 6 = Saturday
     warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
-    assert not any("субота" in w for w in warnings)
+    assert not any("[День 6]" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -145,13 +145,13 @@ def test_non_integer_day_skipped_silently():
 def test_v6b_weekday_marked_holiday_warns():
     grid = [["Day", "Day-type", "Surgery"], ["2", "holiday", ""]]  # June 2 = Tuesday
     warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
-    assert any("2" in w and "вівторок" in w for w in warnings)
+    assert any("[День 2]" in w and "вівторок" in w for w in warnings)
 
 
 def test_v6b_weekday_marked_labour_no_warning():
     grid = [["Day", "Day-type", "Surgery"], ["2", "labour", ""]]  # June 2 = Tuesday
     warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
-    assert not any("вівторок" in w for w in warnings)
+    assert not any("[День 2]" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ def test_missing_date_column_warns():
     mapping["date_column"] = "NonExistent"
     grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
     warnings = validate_draft_grid(grid, mapping, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
-    assert any("NonExistent" in w and "scheduler_date_column" in w for w in warnings)
+    assert any("[Налаштування]" in w and "NonExistent" in w and "scheduler_date_column" in w for w in warnings)
 
 
 def test_missing_day_type_column_warns():
@@ -173,7 +173,7 @@ def test_missing_day_type_column_warns():
     mapping["day_type_column"] = "NonExistent"
     grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
     warnings = validate_draft_grid(grid, mapping, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
-    assert any("NonExistent" in w and "scheduler_day_type_column" in w for w in warnings)
+    assert any("[Налаштування]" in w and "NonExistent" in w and "scheduler_day_type_column" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ def test_missing_day_type_column_warns():
 def test_v2_fires_when_cell_is_none():
     grid = [["Day", "Day-type", "Surgery"], ["5", None, ""]]
     warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
-    assert any("пропущено" in w for w in warnings)
+    assert any("[Структура]" in w and "5" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ def test_v7_empty_name_warns():
     staff = [{"name": "", "department": "Surgery"}]
     grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
     warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
-    assert any("порожнє" in w for w in warnings)
+    assert any("[Персонал]" in w and "порожнє ім'я" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +205,7 @@ def test_v7_invalid_chars_warns():
     staff = [{"name": "Dr@Smith!", "department": "Surgery"}]
     grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
     warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
-    assert any("недопустимі" in w for w in warnings)
+    assert any("[Персонал]" in w and "недопустимі символи" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -216,4 +216,4 @@ def test_v7_ukrainian_name_no_warning():
     staff = [{"name": "Іваненко", "department": "Surgery"}]
     grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
     warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
-    assert not any("недопустимі" in w or "порожнє" in w for w in warnings)
+    assert not any("[Персонал]" in w for w in warnings)

@@ -44,18 +44,18 @@ def validate_draft_grid(
     # Column-not-found diagnostics — emitted before any data checks
     if day_col_idx is None:
         warnings.append(
-            f"Стовпець дня '{date_col}' не знайдено в заголовку — перевірте scheduler_date_column"
+            f"[Налаштування] стовпець '{date_col}' не знайдено в заголовку — перевірте scheduler_date_column"
         )
     if day_type_idx is None:
         warnings.append(
-            f"Стовпець типу дня '{day_type_col}' не знайдено в заголовку — перевірте scheduler_day_type_column"
+            f"[Налаштування] стовпець типу дня '{day_type_col}' не знайдено — перевірте scheduler_day_type_column"
         )
 
     # V1 — empty staff per department
     try:
         for dept in dept_cols:
             if not any(s.get("department") == dept for s in staff_list):
-                warnings.append(f'Відділення "{dept}": немає лікарів — стовпець буде порожнім')
+                warnings.append(f"[Персонал] відділення '{dept}' — немає лікарів, стовпець буде порожнім")
     except Exception:
         pass
 
@@ -63,15 +63,17 @@ def validate_draft_grid(
     try:
         for s in staff_list:
             name = s.get("name", "")
-            if not name or not _NAME_RE.fullmatch(name):
-                warnings.append(f"Лікар: '{name}' — порожнє або містить недопустимі символи")
+            if not name:
+                warnings.append(f"[Персонал] лікар '' — порожнє ім'я")
+            elif not _NAME_RE.fullmatch(name):
+                warnings.append(f"[Персонал] лікар '{name}' — недопустимі символи в імені")
     except Exception:
         pass
 
     # Collect day numbers and per-row issues for V2, V3, V4, V5
     day_numbers: list[int] = []
     empty_day_rows = 0
-    missing_day_type = 0
+    missing_day_type_days: list[int] = []
 
     for row in data_rows:
         day_val = _cell(row, day_col_idx)
@@ -88,17 +90,16 @@ def validate_draft_grid(
 
         day_numbers.append(day_int)
         if not day_type_val:
-            missing_day_type += 1
+            missing_day_type_days.append(day_int)
 
     # V3
     if empty_day_rows:
-        warnings.append(f"{empty_day_rows} рядків без номера дня")
+        warnings.append(f"[Структура] {empty_day_rows} рядків без номера дня")
 
     # V2
-    if missing_day_type:
-        warnings.append(
-            f"{missing_day_type} днів мають номер, але тип дня не заповнено — їх буде пропущено"
-        )
+    if missing_day_type_days:
+        days_str = ", ".join(str(d) for d in missing_day_type_days)
+        warnings.append(f"[Структура] тип дня не заповнено: дні {days_str}")
 
     # V4 — day count vs calendar
     try:
@@ -107,7 +108,7 @@ def validate_draft_grid(
             from schedule_generator import UA_MONTHS
             month_ua = next((k for k, v in UA_MONTHS.items() if v == month_int), str(month_int))
             warnings.append(
-                f"Заповнено {len(day_numbers)} днів, у {month_ua} {year_int} має бути {expected}"
+                f"[Структура] заповнено {len(day_numbers)} днів, очікується {expected} ({month_ua} {year_int})"
             )
     except Exception:
         pass
@@ -121,7 +122,7 @@ def validate_draft_grid(
                     if actual != exp:
                         prev = day_numbers[pos - 2]
                         warnings.append(
-                            f"Порядок днів порушено: після дня {prev} очікувався день {exp}, знайдено {actual}"
+                            f"[День {actual}] порядок порушено — після дня {prev} очікувався день {exp}"
                         )
                         break
     except Exception:
@@ -143,11 +144,11 @@ def validate_draft_grid(
             wd_name = _WEEKDAY_UA.get(wd, "вихідний")
             if wd >= 5 and day_type_val.lower() != "holiday":
                 warnings.append(
-                    f"День {day_int} ({wd_name}) позначено як '{day_type_val}', а не 'holiday'"
+                    f"[День {day_int}] {wd_name} — тип '{day_type_val}', очікується 'holiday'"
                 )
             elif wd < 5 and day_type_val.lower() == "holiday":
                 warnings.append(
-                    f"День {day_int} ({wd_name}) позначено як 'holiday' — можлива помилка"
+                    f"[День {day_int}] {wd_name} — тип 'holiday', очікується 'labour'"
                 )
     except Exception:
         pass

@@ -39,7 +39,12 @@ STATUS - ACCEPTED
 
 ### U006b2-2 — Warning appears for Sat/Sun not marked holiday
 
-STATUS - Feedback / CR
+STATUS - Fixed — pending Owner re-run
+
+**Fixes applied:**
+- V5 message now reads "після дня {prev} очікувався день {exp}, знайдено {actual}" — day numbers visible in spreadsheet
+- Warning block also written to Draft-by-bot tab (not only Telegram)
+- V6b added: Mon–Fri marked `holiday` also warns with Ukrainian weekday name
 
 **Steps:**
 1. In Draft tab, change day-type of a Saturday or Sunday to `labour`
@@ -53,7 +58,9 @@ STATUS - Feedback / CR
 
 ### U006b2-3 — Warning appears for empty day-type cell
 
-STATUS - FAILED
+STATUS - Fixed — pending Owner re-run
+
+**Fix applied:** `_cell()` helper added — guards against gspread returning `None` for empty cells (`str(None)` = `"None"` was masking empty values). Column-not-found diagnostic added for misconfigured mapping.
 
 **Steps:**
 1. In Draft tab, clear the day-type cell of one row (leave day number filled)
@@ -78,14 +85,14 @@ cd ~/Shedule_bot && source venv/bin/activate && TZ=Europe/Kyiv python main.py --
 
 ## UAT sign-off
 
-| Case     | Result | Notes  |
-|----------|--------|--------|
-| U006b2-1 | OK     |        |
-| U006b2-2 | CR     | 06b2-1 |
-| U006b2-3 | FAILED | 06b2-3 |
-| U006b2-4 | OK     |        |
+| Case     | Result              | Notes                                    |
+|----------|---------------------|------------------------------------------|
+| U006b2-1 | OK                  |                                          |
+| U006b2-2 | ⏸ Re-run required  | V5 message + tab fix applied             |
+| U006b2-3 | ⏸ Re-run required  | `_cell()` fix applied                    |
+| U006b2-4 | OK                  |                                          |
 
-**Status:** ⏸ Pending
+**Status:** ⏸ Pending Owner re-run of U006b2-2 and U006b2-3
 
 ## Feedback:
 
