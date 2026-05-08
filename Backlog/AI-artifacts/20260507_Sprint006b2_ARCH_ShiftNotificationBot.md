@@ -147,5 +147,5 @@ None — all inputs confirmed by Owner 2026-05-07.
 |---|---|---|
 | Architect | 2026-05-07 | ✅ V7 + trim AD added 2026-05-07; F1 accepted |
 | Developer | — | ⏸ |
-| QA | — | ⏸ |
+| QA | 2026-05-08 | ✅ F1 fixed; F2 deferred |
 | Owner | — | ⏸ UAT pending |

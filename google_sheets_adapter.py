@@ -10,7 +10,7 @@ def get_staff_list(sheet_id: str, tab_name: str, credentials_path: str) -> list[
     worksheet = gc.open_by_key(sheet_id).worksheet(tab_name)
     records = worksheet.get_all_records()
     return [
-        {"name": row[STAFF_NAME_COL], "department": row[STAFF_DEPT_COL]}
+        {"name": str(row[STAFF_NAME_COL]).strip(), "department": str(row[STAFF_DEPT_COL]).strip()}
         for row in records
         if row.get(STAFF_NAME_COL)
     ]

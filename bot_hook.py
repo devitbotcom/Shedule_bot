@@ -16,6 +16,7 @@ if os.path.isdir(_VENV):
     sys.path.insert(0, _VENV)
 sys.path.insert(0, _ROOT)
 
+import logging
 import requests
 
 from db import (
@@ -60,6 +61,7 @@ def _cmd_draft(token: str, chat_id: str) -> None:
 
     from google_sheets_adapter import get_staff_list, get_schedule_grid, read_cell, write_schedule_grid
     from schedule_generator import UA_MONTHS, generate_schedule
+    from schedule_validator import validate_draft_grid
 
     try:
         month_str = read_cell(sheet_id, schedule_tab, month_cell, creds).strip().lower()
@@ -72,12 +74,27 @@ def _cmd_draft(token: str, chat_id: str) -> None:
         _send(token, chat_id, f"❌ Невідома назва місяця: '{month_str}'. Очікується українська назва (наприклад, 'червень').")
         return
 
+    month_int = UA_MONTHS[month_str]
+    try:
+        year_int = int(year_str)
+    except ValueError:
+        year_int = None
+
     try:
         staff_list = get_staff_list(sheet_id, staff_tab, creds)
         template_grid = get_schedule_grid(sheet_id, schedule_tab, creds)
     except Exception as exc:
         _send(token, chat_id, f"❌ Не вдалось прочитати дані з Google Sheets: {exc}")
         return
+
+    validation_warnings = []
+    if year_int is not None:
+        try:
+            validation_warnings = validate_draft_grid(template_grid, mapping, staff_list, month_int, year_int)
+        except Exception:
+            pass
+    for w in validation_warnings:
+        logging.warning("draft validation: %s", w)
 
     try:
         filled_grid = generate_schedule(staff_list, template_grid, mapping)
@@ -91,7 +108,11 @@ def _cmd_draft(token: str, chat_id: str) -> None:
         _send(token, chat_id, f"❌ Не вдалось записати результат до Google Sheets: {exc}")
         return
 
-    _send(token, chat_id, f"✅ Чернетку розкладу на {month_str} {year_str} записано у вкладку '{output_tab}'.")
+    reply = f"✅ Чернетку розкладу на {month_str} {year_str} записано у вкладку '{output_tab}'."
+    if validation_warnings:
+        warn_block = "\n".join(f"• {w}" for w in validation_warnings)
+        reply += f"\n\n⚠️ Попередження:\n{warn_block}"
+    _send(token, chat_id, reply)
 
 
 def _handle(update: dict, token: str, db_path: str) -> None:

@@ -26,3 +26,7 @@ U005-5 (verify `/setrole` appears in `/help` for IT role) was skipped during UAT
 ### 006b-02 Webhook handler does not log each incoming request attempt [P2, S006c+]
 
 Only errors are logged to `webhook.log`. Each incoming Telegram update is not recorded, making silent failures (bot receives message but does nothing) invisible to IT without manual debugging.
+
+### 006b2-01 Invalid year silently skips validation [Low, S007+]
+
+In `bot_hook._cmd_draft`, if `year_str` cannot be parsed as an integer, `year_int` is set to `None` and the entire validator call is skipped without any feedback to Head. Only V4 and V6 require `year_int`; checks V1, V2, V3, V5, V7 could still run. No warning is sent to Head that validation was bypassed.
