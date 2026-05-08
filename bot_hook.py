@@ -102,6 +102,12 @@ def _cmd_draft(token: str, chat_id: str) -> None:
         _send(token, chat_id, f"❌ Помилка генерації розкладу: {exc}")
         return
 
+    if validation_warnings:
+        filled_grid.append([])
+        filled_grid.append(["⚠️ Попередження:"])
+        for w in validation_warnings:
+            filled_grid.append([f"• {w}"])
+
     try:
         write_schedule_grid(sheet_id, output_tab, filled_grid, creds)
     except Exception as exc:

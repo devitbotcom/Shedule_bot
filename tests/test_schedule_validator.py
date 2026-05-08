@@ -100,7 +100,7 @@ def test_v5_days_out_of_order():
         ["2", "labour", ""],
     ]
     warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
-    assert any("порядку" in w for w in warnings)
+    assert any("порушено" in w and "2" in w and "3" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +136,54 @@ def test_non_integer_day_skipped_silently():
     ]
     warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
     assert not any("травень" in w for w in warnings)
+
+
+# ---------------------------------------------------------------------------
+# T13 — V6b: weekday marked holiday warns
+# ---------------------------------------------------------------------------
+
+def test_v6b_weekday_marked_holiday_warns():
+    grid = [["Day", "Day-type", "Surgery"], ["2", "holiday", ""]]  # June 2 = Tuesday
+    warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
+    assert any("2" in w and "вівторок" in w for w in warnings)
+
+
+def test_v6b_weekday_marked_labour_no_warning():
+    grid = [["Day", "Day-type", "Surgery"], ["2", "labour", ""]]  # June 2 = Tuesday
+    warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
+    assert not any("вівторок" in w for w in warnings)
+
+
+# ---------------------------------------------------------------------------
+# T14 — missing column diagnostic
+# ---------------------------------------------------------------------------
+
+def test_missing_date_column_warns():
+    mapping = dict(_MAPPING)
+    mapping["scheduler_date_column"] = "NonExistent"
+    mapping["date_column"] = "NonExistent"
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, mapping, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
+    assert any("NonExistent" in w and "scheduler_date_column" in w for w in warnings)
+
+
+def test_missing_day_type_column_warns():
+    mapping = dict(_MAPPING)
+    mapping["scheduler_day_type_column"] = "NonExistent"
+    mapping["day_type_column"] = "NonExistent"
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, mapping, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
+    assert any("NonExistent" in w and "scheduler_day_type_column" in w for w in warnings)
+
+
+# ---------------------------------------------------------------------------
+# T15 — None cell value handled correctly (V2 fires even when gspread returns None)
+# ---------------------------------------------------------------------------
+
+def test_v2_fires_when_cell_is_none():
+    grid = [["Day", "Day-type", "Surgery"], ["5", None, ""]]
+    warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
+    assert any("пропущено" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------

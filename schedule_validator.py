@@ -3,7 +3,18 @@ import re
 from datetime import date
 
 _NAME_RE = re.compile(r'^[\w\s\-\']+$', re.UNICODE)
-_WEEKDAY_UA = {5: "субота", 6: "неділя"}
+_WEEKDAY_UA = {
+    0: "понеділок", 1: "вівторок", 2: "середа",
+    3: "четвер", 4: "п'ятниця", 5: "субота", 6: "неділя",
+}
+
+
+def _cell(row: list, idx) -> str:
+    """Safe cell read: returns empty string for missing index or None value."""
+    if idx is None or idx >= len(row):
+        return ""
+    val = row[idx]
+    return str(val).strip() if val is not None else ""
 
 
 def validate_draft_grid(
@@ -30,6 +41,16 @@ def validate_draft_grid(
     day_type_idx = col_idx.get(day_type_col)
     data_rows = grid[header_idx + 1:]
 
+    # Column-not-found diagnostics — emitted before any data checks
+    if day_col_idx is None:
+        warnings.append(
+            f"Стовпець дня '{date_col}' не знайдено в заголовку — перевірте scheduler_date_column"
+        )
+    if day_type_idx is None:
+        warnings.append(
+            f"Стовпець типу дня '{day_type_col}' не знайдено в заголовку — перевірте scheduler_day_type_column"
+        )
+
     # V1 — empty staff per department
     try:
         for dept in dept_cols:
@@ -53,8 +74,8 @@ def validate_draft_grid(
     missing_day_type = 0
 
     for row in data_rows:
-        day_val = str(row[day_col_idx]).strip() if day_col_idx is not None and day_col_idx < len(row) else ""
-        day_type_val = str(row[day_type_idx]).strip() if day_type_idx is not None and day_type_idx < len(row) else ""
+        day_val = _cell(row, day_col_idx)
+        day_type_val = _cell(row, day_type_idx)
 
         if not day_val:
             empty_day_rows += 1
@@ -91,20 +112,27 @@ def validate_draft_grid(
     except Exception:
         pass
 
-    # V5 — days in order
+    # V5 — days in order (show first out-of-order position)
     try:
         if day_numbers:
             expected_seq = list(range(day_numbers[0], day_numbers[0] + len(day_numbers)))
             if day_numbers != expected_seq:
-                warnings.append("Дні йдуть не по порядку або є пропуски")
+                for pos, (actual, exp) in enumerate(zip(day_numbers, expected_seq), start=1):
+                    if actual != exp:
+                        warnings.append(
+                            f"Порядок днів порушено: позиція {pos} — очікувалось {exp}, знайдено {actual}"
+                        )
+                        break
+                else:
+                    warnings.append("Порядок днів порушено: кількість днів не збігається")
     except Exception:
         pass
 
-    # V6 — Sat/Sun must be holiday
+    # V6/V6b — weekend/weekday day-type mismatch
     try:
         for row in data_rows:
-            day_val = str(row[day_col_idx]).strip() if day_col_idx is not None and day_col_idx < len(row) else ""
-            day_type_val = str(row[day_type_idx]).strip() if day_type_idx is not None and day_type_idx < len(row) else ""
+            day_val = _cell(row, day_col_idx)
+            day_type_val = _cell(row, day_type_idx)
             if not day_val:
                 continue
             try:
@@ -113,9 +141,15 @@ def validate_draft_grid(
             except (ValueError, OverflowError):
                 continue
             wd = d.weekday()
+            wd_name = _WEEKDAY_UA.get(wd, "вихідний")
             if wd >= 5 and day_type_val.lower() != "holiday":
-                wd_name = _WEEKDAY_UA.get(wd, "вихідний")
-                warnings.append(f"День {day_int} ({wd_name}) позначено як '{day_type_val}', а не 'holiday'")
+                warnings.append(
+                    f"День {day_int} ({wd_name}) позначено як '{day_type_val}', а не 'holiday'"
+                )
+            elif wd < 5 and day_type_val.lower() == "holiday":
+                warnings.append(
+                    f"День {day_int} ({wd_name}) позначено як 'holiday' — можлива помилка"
+                )
     except Exception:
         pass
 

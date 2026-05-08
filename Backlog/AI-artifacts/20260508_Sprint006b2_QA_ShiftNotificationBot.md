@@ -70,9 +70,26 @@
 
 ---
 
+## UAT findings — resolved (2026-05-08)
+
+| UAT finding | Fix | New tests |
+|---|---|---|
+| 06b2-3 CRITICAL — V2 not firing on empty cell | `_cell()` helper prevents `str(None)="None"`; column-not-found diagnostic added | T14, T15 |
+| 06b2-1 — Mon-Fri not checked for holiday | V6b added: weekday marked `holiday` warns with Ukrainian name | T13a, T13b |
+| 06b2-2 part 1 — V5 message too vague | First out-of-order position shown explicitly | T6 updated |
+| 06b2-2 part 2 — warnings not in tab | Warning block appended to `filled_grid` before write | `test_cmd_draft_warnings_appended_to_grid` |
+
+**Suite after fixes: 162/162 passing.**
+
+**Post-UAT finding:**
+
+| ID | Severity | Location | Description |
+|---|---|---|---|
+| F3 | 🔵 Low | `schedule_validator.py:126` | V5 `for…else` dead code — `else` never fires since `expected_seq` is same length as `day_numbers`. Harmless. |
+
 ## Overall verdict
 
-**✅ ACCEPTED — F1 fixed, F2 deferred. 156/156 passing. Zero regressions.**
+**✅ ACCEPTED — UAT findings resolved. F1 fixed, F2/F3 deferred. 162/162 passing. Zero regressions.**
 
 **UAT doc:** to be created.
 
@@ -84,5 +101,5 @@
 |---|---|---|
 | Architect | 2026-05-07 | ✅ |
 | Developer | 2026-05-07 | ✅ |
-| QA | 2026-05-08 | ✅ F1 fixed; F2 deferred — UAT pending |
+| QA | 2026-05-08 | ✅ UAT findings resolved; F1/F2/F3 deferred — UAT re-run pending |
 | Owner | — | ⏸ UAT pending |

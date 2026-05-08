@@ -179,7 +179,7 @@ Expected:
 - P2 Integration monitoring dashboard/escalation to IT if system unhealthy.
 
 
-### 06-2 lack of visibility with integration failures - [medium]
+### 06b-02 lack of visibility with integration failures - [medium]
 Actual
 ```chat
 /draft
@@ -205,7 +205,7 @@ Expected:
 - P2 Logs need to record each hook attempt
 
 
-### Draft-by-bot content repeats the Draft content [CRITICAL]
+###  06b-03 Draft-by-bot content repeats the Draft content [CRITICAL] - DONE
 
 STR  
 U006b-2 — `/draft` generates schedule and writes Draft-by-bot tab
@@ -246,10 +246,10 @@ Actual:
 відділення etc., and copies the grid unchanged.
 
 Expected: 
-Add separate papping for cells in scheduler.
+Add separate mapping for cells in scheduler.
 
 
-### Usability - CR. Add link to google sheet into positive response. - [LOW]
+### 06b-03 Usability - CR. Add link to google sheet into positive response. - [LOW]
 Actual:
 ✅ Чернетку розкладу на квітень 2026 записано у вкладку 'Draft-by-bot'.
 

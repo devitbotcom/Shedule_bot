@@ -159,3 +159,39 @@ def test_cmd_draft_happy_path(monkeypatch, tmp_path):
     assert "✅" in sent.last_text
     assert "червень" in sent.last_text
     assert "2026" in sent.last_text
+
+
+def test_cmd_draft_warnings_appended_to_grid(monkeypatch, tmp_path):
+    written: list = []
+
+    def _capture_write(sid, tab, rows, creds):
+        written.extend(rows)
+
+    sent = _FakeSend()
+    monkeypatch.setattr("bot_hook._send", sent)
+    monkeypatch.setenv("GOOGLE_SHEET_ID", "sid")
+    monkeypatch.setenv("GOOGLE_SERVICE_ACCOUNT_JSON", "/creds.json")
+
+    mapping = dict(_MAPPING)
+    mapping["scheduler_date_column"] = "Date"
+    mapping["date_column"] = "Date"
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "schedule_mapping.json").write_text(json.dumps(mapping), encoding="utf-8")
+    monkeypatch.setattr("bot_hook._ROOT", str(tmp_path))
+
+    # grid with Saturday (2026-06-06) marked labour — triggers V6 warning
+    grid_with_issue = [
+        ["Date", "Day-type", "Surgery"],
+        ["6", "labour", ""],  # June 6 = Saturday
+    ]
+    monkeypatch.setattr("google_sheets_adapter.read_cell", lambda sid, tab, cell, creds: "червень" if cell == "A1" else "2026")
+    monkeypatch.setattr("google_sheets_adapter.get_staff_list", lambda *a, **kw: _STAFF)
+    monkeypatch.setattr("google_sheets_adapter.get_schedule_grid", lambda *a, **kw: grid_with_issue)
+    monkeypatch.setattr("google_sheets_adapter.write_schedule_grid", _capture_write)
+
+    _cmd_draft("T", "42")
+    flat = [str(cell) for row in written for cell in row]
+    assert any("⚠️" in s for s in flat)
+    assert "⚠️ Попередження:" in sent.last_text
