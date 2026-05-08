@@ -1,3 +1,8 @@
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 from schedule_generator import UA_MONTHS, generate_schedule
 
 _MAPPING = {
@@ -121,3 +126,98 @@ def test_generate_does_not_mutate_input():
     original_cell = grid[1][2]
     generate_schedule(staff, grid, mapping)
     assert grid[1][2] == original_cell  # input grid not mutated
+
+
+# ---------------------------------------------------------------------------
+# C1 — pre-filled cells: skip + count toward balance
+# ---------------------------------------------------------------------------
+
+_PREF_MAPPING = {
+    "header_row": 1,
+    "day_type_column": "Day-type",
+    "department_columns": ["Surgery"],
+    "date_column": "Day",
+}
+
+
+def test_c1_prefilled_cell_not_overwritten():
+    staff = [{"name": "Alice", "department": "Surgery"},
+             {"name": "Bob", "department": "Surgery"}]
+    grid = [
+        ["Day", "Day-type", "Surgery"],
+        ["1", "labour", "Alice"],   # pre-filled
+        ["2", "labour", ""],
+    ]
+    result = generate_schedule(staff, grid, _PREF_MAPPING)
+    assert result[1][2] == "Alice"   # pre-fill preserved
+
+
+def test_c1_prefilled_counted_in_balance():
+    """Pre-filled Alice on day 1 → Bob assigned on day 2 (balance corrected)."""
+    staff = [{"name": "Alice", "department": "Surgery"},
+             {"name": "Bob", "department": "Surgery"}]
+    grid = [
+        ["Day", "Day-type", "Surgery"],
+        ["1", "labour", "Alice"],   # Alice pre-filled (count=1)
+        ["2", "labour", ""],
+    ]
+    result = generate_schedule(staff, grid, _PREF_MAPPING)
+    assert result[2][2] == "Bob"    # Bob has lower count → chosen
+
+
+def test_c1_unknown_prefill_name_no_crash():
+    staff = [{"name": "Alice", "department": "Surgery"}]
+    grid = [
+        ["Day", "Day-type", "Surgery"],
+        ["1", "labour", "UnknownPerson"],  # not in staff list
+        ["2", "labour", ""],
+    ]
+    result = generate_schedule(staff, grid, _PREF_MAPPING)
+    assert result[1][2] == "UnknownPerson"   # unchanged
+    assert result[2][2] == "Alice"           # Alice still assigned
+
+
+# ---------------------------------------------------------------------------
+# C8 — preference-aware slot selection
+# ---------------------------------------------------------------------------
+
+def test_c8_preferred_assigned_before_neutral():
+    """Alice prefers day 1, Bob is neutral → Alice assigned on day 1."""
+    staff = [
+        {"name": "Alice", "department": "Surgery", "preferred_days": [1], "undesired_days": []},
+        {"name": "Bob",   "department": "Surgery", "preferred_days": [],  "undesired_days": []},
+    ]
+    grid = [
+        ["Day", "Day-type", "Surgery"],
+        ["1", "labour", ""],
+    ]
+    result = generate_schedule(staff, grid, _PREF_MAPPING)
+    assert result[1][2] == "Alice"
+
+
+def test_c8_neutral_assigned_before_undesired():
+    """Bob is neutral, Alice has day 2 as undesired → Bob assigned on day 2."""
+    staff = [
+        {"name": "Alice", "department": "Surgery", "preferred_days": [],  "undesired_days": [2]},
+        {"name": "Bob",   "department": "Surgery", "preferred_days": [],  "undesired_days": []},
+    ]
+    grid = [
+        ["Day", "Day-type", "Surgery"],
+        ["2", "labour", ""],
+    ]
+    result = generate_schedule(staff, grid, _PREF_MAPPING)
+    assert result[1][2] == "Bob"
+
+
+def test_c8_all_undesired_slot_still_filled():
+    """Both candidates mark day 3 as undesired — slot still filled (soft constraint)."""
+    staff = [
+        {"name": "Alice", "department": "Surgery", "preferred_days": [], "undesired_days": [3]},
+        {"name": "Bob",   "department": "Surgery", "preferred_days": [], "undesired_days": [3]},
+    ]
+    grid = [
+        ["Day", "Day-type", "Surgery"],
+        ["3", "labour", ""],
+    ]
+    result = generate_schedule(staff, grid, _PREF_MAPPING)
+    assert result[1][2] in ("Alice", "Bob")   # someone assigned

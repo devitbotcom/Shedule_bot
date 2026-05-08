@@ -80,19 +80,22 @@ def _cmd_draft(token: str, chat_id: str) -> None:
     except ValueError:
         year_int = None
 
+    preferred_col = mapping.get("scheduler_preferred_dates_column")
+    undesired_col = mapping.get("scheduler_undesired_dates_column")
+
     try:
-        staff_list = get_staff_list(sheet_id, staff_tab, creds)
+        staff_list = get_staff_list(sheet_id, staff_tab, creds,
+                                    preferred_col=preferred_col, undesired_col=undesired_col)
         template_grid = get_schedule_grid(sheet_id, schedule_tab, creds)
     except Exception as exc:
         _send(token, chat_id, f"❌ Не вдалось прочитати дані з Google Sheets: {exc}")
         return
 
     validation_warnings = []
-    if year_int is not None:
-        try:
-            validation_warnings = validate_draft_grid(template_grid, mapping, staff_list, month_int, year_int)
-        except Exception:
-            pass
+    try:
+        validation_warnings = validate_draft_grid(template_grid, mapping, staff_list, month_int, year_int)
+    except Exception:
+        pass
     for w in validation_warnings:
         logging.warning("draft validation: %s", w)
 
@@ -115,6 +118,7 @@ def _cmd_draft(token: str, chat_id: str) -> None:
         return
 
     reply = f"✅ Чернетку розкладу на {month_str} {year_str} записано у вкладку '{output_tab}'."
+    reply += f"\n🔗 https://docs.google.com/spreadsheets/d/{sheet_id} — вкладка '{output_tab}'"
     if validation_warnings:
         warn_block = "\n".join(f"• {w}" for w in validation_warnings)
         reply += f"\n\n⚠️ Попередження:\n{warn_block}"

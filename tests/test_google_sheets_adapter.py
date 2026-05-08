@@ -30,8 +30,8 @@ def test_get_staff_list_returns_name_department_dicts(mock_sa):
     ])
     result = get_staff_list("sheet-id", "Staff", "/creds.json")
     assert result == [
-        {"name": "Alice", "department": "Surgery"},
-        {"name": "Bob", "department": "Anesthesia"},
+        {"name": "Alice", "department": "Surgery", "preferred_days": [], "undesired_days": []},
+        {"name": "Bob", "department": "Anesthesia", "preferred_days": [], "undesired_days": []},
     ]
 
 
@@ -44,6 +44,53 @@ def test_get_staff_list_skips_rows_with_empty_name(mock_sa):
     result = get_staff_list("sheet-id", "Staff", "/creds.json")
     assert len(result) == 1
     assert result[0]["name"] == "Alice"
+
+
+# ---------------------------------------------------------------------------
+# C7 — preference columns
+# ---------------------------------------------------------------------------
+
+@patch("google_sheets_adapter.gspread.service_account")
+def test_get_staff_list_parses_preferred_days(mock_sa):
+    mock_sa.return_value = _mock_gc(records=[
+        {STAFF_NAME_COL: "Alice", STAFF_DEPT_COL: "Surgery", "preferred_dates": "1, 5, 15"},
+    ])
+    result = get_staff_list("sheet-id", "Staff", "/creds.json", preferred_col="preferred_dates")
+    assert result[0]["preferred_days"] == [1, 5, 15]
+    assert result[0]["undesired_days"] == []
+
+
+@patch("google_sheets_adapter.gspread.service_account")
+def test_get_staff_list_parses_undesired_days(mock_sa):
+    mock_sa.return_value = _mock_gc(records=[
+        {STAFF_NAME_COL: "Alice", STAFF_DEPT_COL: "Surgery", "undesired_dates": "10, 20"},
+    ])
+    result = get_staff_list("sheet-id", "Staff", "/creds.json", undesired_col="undesired_dates")
+    assert result[0]["undesired_days"] == [10, 20]
+    assert result[0]["preferred_days"] == []
+
+
+@patch("google_sheets_adapter.gspread.service_account")
+def test_get_staff_list_missing_preference_column_returns_empty_lists(mock_sa):
+    mock_sa.return_value = _mock_gc(records=[
+        {STAFF_NAME_COL: "Alice", STAFF_DEPT_COL: "Surgery"},
+    ])
+    result = get_staff_list("sheet-id", "Staff", "/creds.json",
+                            preferred_col="preferred_dates", undesired_col="undesired_dates")
+    assert result[0]["preferred_days"] == []
+    assert result[0]["undesired_days"] == []
+
+
+@patch("google_sheets_adapter.gspread.service_account")
+def test_get_staff_list_empty_preference_cell_returns_empty_lists(mock_sa):
+    mock_sa.return_value = _mock_gc(records=[
+        {STAFF_NAME_COL: "Alice", STAFF_DEPT_COL: "Surgery",
+         "preferred_dates": "", "undesired_dates": ""},
+    ])
+    result = get_staff_list("sheet-id", "Staff", "/creds.json",
+                            preferred_col="preferred_dates", undesired_col="undesired_dates")
+    assert result[0]["preferred_days"] == []
+    assert result[0]["undesired_days"] == []
 
 
 @patch("google_sheets_adapter.gspread.service_account")

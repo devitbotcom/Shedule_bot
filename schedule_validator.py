@@ -22,7 +22,7 @@ def validate_draft_grid(
     mapping: dict,
     staff_list: list[dict],
     month_int: int,
-    year_int: int,
+    year_int: int | None,
 ) -> list[str]:
     """Returns list of non-blocking warning strings about Draft grid quality."""
     warnings = []
@@ -71,26 +71,28 @@ def validate_draft_grid(
         pass
 
     # Collect day numbers and per-row issues for V2, V3, V4, V5
+    # C4: skip entire loop when date column is missing to prevent V3 cascade noise
     day_numbers: list[int] = []
     empty_day_rows = 0
     missing_day_type_days: list[int] = []
 
-    for row in data_rows:
-        day_val = _cell(row, day_col_idx)
-        day_type_val = _cell(row, day_type_idx)
+    if day_col_idx is not None:
+        for row in data_rows:
+            day_val = _cell(row, day_col_idx)
+            day_type_val = _cell(row, day_type_idx)
 
-        if not day_val:
-            empty_day_rows += 1
-            continue
+            if not day_val:
+                empty_day_rows += 1
+                continue
 
-        try:
-            day_int = int(day_val)
-        except ValueError:
-            continue  # non-integer cell — skip silently (AD-S006b2-003)
+            try:
+                day_int = int(day_val)
+            except ValueError:
+                continue  # non-integer cell — skip silently (AD-S006b2-003)
 
-        day_numbers.append(day_int)
-        if not day_type_val:
-            missing_day_type_days.append(day_int)
+            day_numbers.append(day_int)
+            if not day_type_val:
+                missing_day_type_days.append(day_int)
 
     # V3
     if empty_day_rows:
@@ -101,17 +103,18 @@ def validate_draft_grid(
         days_str = ", ".join(str(d) for d in missing_day_type_days)
         warnings.append(f"[Структура] тип дня не заповнено: дні {days_str}")
 
-    # V4 — day count vs calendar
-    try:
-        expected = calendar.monthrange(year_int, month_int)[1]
-        if len(day_numbers) != expected:
-            from schedule_generator import UA_MONTHS
-            month_ua = next((k for k, v in UA_MONTHS.items() if v == month_int), str(month_int))
-            warnings.append(
-                f"[Структура] заповнено {len(day_numbers)} днів, очікується {expected} ({month_ua} {year_int})"
-            )
-    except Exception:
-        pass
+    # V4 — day count vs calendar (requires year_int)
+    if year_int is not None:
+        try:
+            expected = calendar.monthrange(year_int, month_int)[1]
+            if len(day_numbers) != expected:
+                from schedule_generator import UA_MONTHS
+                month_ua = next((k for k, v in UA_MONTHS.items() if v == month_int), str(month_int))
+                warnings.append(
+                    f"[Структура] заповнено {len(day_numbers)} днів, очікується {expected} ({month_ua} {year_int})"
+                )
+        except Exception:
+            pass
 
     # V5 — days in order (show first out-of-order position)
     try:
@@ -128,29 +131,30 @@ def validate_draft_grid(
     except Exception:
         pass
 
-    # V6/V6b — weekend/weekday day-type mismatch
-    try:
-        for row in data_rows:
-            day_val = _cell(row, day_col_idx)
-            day_type_val = _cell(row, day_type_idx)
-            if not day_val:
-                continue
-            try:
-                day_int = int(day_val)
-                d = date(year_int, month_int, day_int)
-            except (ValueError, OverflowError):
-                continue
-            wd = d.weekday()
-            wd_name = _WEEKDAY_UA.get(wd, "вихідний")
-            if wd >= 5 and day_type_val.lower() != "holiday":
-                warnings.append(
-                    f"[День {day_int}] {wd_name} — тип '{day_type_val}', очікується 'holiday'"
-                )
-            elif wd < 5 and day_type_val.lower() == "holiday":
-                warnings.append(
-                    f"[День {day_int}] {wd_name} — тип 'holiday', очікується 'labour'"
-                )
-    except Exception:
-        pass
+    # V6/V6b — weekend/weekday day-type mismatch (requires year_int)
+    if year_int is not None:
+        try:
+            for row in data_rows:
+                day_val = _cell(row, day_col_idx)
+                day_type_val = _cell(row, day_type_idx)
+                if not day_val:
+                    continue
+                try:
+                    day_int = int(day_val)
+                    d = date(year_int, month_int, day_int)
+                except (ValueError, OverflowError, TypeError):
+                    continue
+                wd = d.weekday()
+                wd_name = _WEEKDAY_UA.get(wd, "вихідний")
+                if wd >= 5 and day_type_val.lower() != "holiday":
+                    warnings.append(
+                        f"[День {day_int}] {wd_name} — тип '{day_type_val}', очікується 'holiday'"
+                    )
+                elif wd < 5 and day_type_val.lower() == "holiday":
+                    warnings.append(
+                        f"[День {day_int}] {wd_name} — тип 'holiday', очікується 'labour'"
+                    )
+        except Exception:
+            pass
 
     return warnings

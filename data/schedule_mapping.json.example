@@ -37,5 +37,7 @@
     "неврологія",
     "УЗД",
     "Дитяче відділення"
-  ]
+  ],
+  "scheduler_preferred_dates_column":  "preferred_dates",
+  "scheduler_undesired_dates_column":  "undesired_dates"
 }

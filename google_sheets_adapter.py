@@ -4,16 +4,41 @@ STAFF_NAME_COL = "Name"
 STAFF_DEPT_COL = "Department"
 
 
-def get_staff_list(sheet_id: str, tab_name: str, credentials_path: str) -> list[dict]:
-    """Returns list of {name, department} dicts from the staff tab."""
+def _parse_days(value: str) -> list[int]:
+    """Parse comma-separated day numbers; skips non-integer tokens silently."""
+    result = []
+    for token in value.split(","):
+        token = token.strip()
+        if token:
+            try:
+                result.append(int(token))
+            except ValueError:
+                pass
+    return result
+
+
+def get_staff_list(
+    sheet_id: str,
+    tab_name: str,
+    credentials_path: str,
+    preferred_col: str | None = None,
+    undesired_col: str | None = None,
+) -> list[dict]:
+    """Returns list of {name, department, preferred_days, undesired_days} dicts from the staff tab."""
     gc = gspread.service_account(filename=credentials_path)
     worksheet = gc.open_by_key(sheet_id).worksheet(tab_name)
     records = worksheet.get_all_records()
-    return [
-        {"name": str(row[STAFF_NAME_COL]).strip(), "department": str(row[STAFF_DEPT_COL]).strip()}
-        for row in records
-        if row.get(STAFF_NAME_COL)
-    ]
+    result = []
+    for row in records:
+        if not row.get(STAFF_NAME_COL):
+            continue
+        result.append({
+            "name": str(row[STAFF_NAME_COL]).strip(),
+            "department": str(row[STAFF_DEPT_COL]).strip(),
+            "preferred_days": _parse_days(str(row.get(preferred_col) or "")) if preferred_col else [],
+            "undesired_days": _parse_days(str(row.get(undesired_col) or "")) if undesired_col else [],
+        })
+    return result
 
 
 def get_schedule_grid(sheet_id: str, tab_name: str, credentials_path: str) -> list[list]:

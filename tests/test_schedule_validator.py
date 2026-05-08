@@ -75,7 +75,7 @@ def test_v3_empty_day_cell():
 def test_v4_leap_year_no_warning():
     grid = _make_clean_grid(2, 2028)   # 29 days
     warnings = validate_draft_grid(grid, _MAPPING, _STAFF, 2, 2028)
-    assert not any("має бути" in w for w in warnings)
+    assert not any("[Структура]" in w and "очікується" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -231,3 +231,51 @@ def test_v7_double_dot_warns():
     grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
     warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
     assert any("[Персонал]" in w and "недопустимі символи" in w for w in warnings)
+
+
+# ---------------------------------------------------------------------------
+# C3 — year_int=None: V1/V2/V3/V5/V7 still run, V4/V6 skipped, no warning added
+# ---------------------------------------------------------------------------
+
+def test_c3_year_none_v1_still_runs():
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, _MAPPING, [], _JUNE_MONTH, None)
+    assert any("[Персонал]" in w and "Surgery" in w for w in warnings)
+
+
+def test_c3_year_none_no_extra_warning():
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, None)
+    assert not any("рік" in w.lower() for w in warnings)
+
+
+def test_c3_year_none_v4_not_in_warnings():
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, None)
+    assert not any("[Структура]" in w and "очікується" in w for w in warnings)
+
+
+def test_c3_year_none_v6_not_in_warnings():
+    grid = [["Day", "Day-type", "Surgery"], ["6", "labour", ""]]  # June 6 = Saturday
+    warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, None)
+    assert not any("[День" in w for w in warnings)
+
+
+def test_c3_year_none_no_crash():
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    result = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, None)
+    assert isinstance(result, list)
+
+
+# ---------------------------------------------------------------------------
+# C4 — missing date column: V3 does not cascade
+# ---------------------------------------------------------------------------
+
+def test_c4_missing_date_column_no_v3_cascade():
+    mapping = dict(_MAPPING)
+    mapping["scheduler_date_column"] = "NonExistent"
+    mapping["date_column"] = "NonExistent"
+    grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
+    warnings = validate_draft_grid(grid, mapping, _STAFF, _JUNE_MONTH, _JUNE_YEAR)
+    assert any("[Налаштування]" in w for w in warnings)
+    assert not any("[Структура]" in w and "рядків без номера" in w for w in warnings)

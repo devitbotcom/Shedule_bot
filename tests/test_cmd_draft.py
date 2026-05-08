@@ -161,6 +161,73 @@ def test_cmd_draft_happy_path(monkeypatch, tmp_path):
     assert "2026" in sent.last_text
 
 
+def test_cmd_draft_reply_includes_sheet_link(monkeypatch, tmp_path):
+    sent = _FakeSend()
+    monkeypatch.setattr("bot_hook._send", sent)
+    monkeypatch.setenv("GOOGLE_SHEET_ID", "my-sheet-id")
+    monkeypatch.setenv("GOOGLE_SERVICE_ACCOUNT_JSON", "/creds.json")
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "schedule_mapping.json").write_text(json.dumps(_MAPPING), encoding="utf-8")
+    monkeypatch.setattr("bot_hook._ROOT", str(tmp_path))
+
+    monkeypatch.setattr("google_sheets_adapter.read_cell", lambda sid, tab, cell, creds: "червень" if cell == "A1" else "2026")
+    monkeypatch.setattr("google_sheets_adapter.get_staff_list", lambda *a, **kw: _STAFF)
+    monkeypatch.setattr("google_sheets_adapter.get_schedule_grid", lambda *a, **kw: _GRID)
+    monkeypatch.setattr("google_sheets_adapter.write_schedule_grid", lambda *a, **kw: None)
+
+    _cmd_draft("T", "42")
+    assert "docs.google.com/spreadsheets/d/my-sheet-id" in sent.last_text
+    assert "Draft-by-bot" in sent.last_text
+
+
+def test_cmd_draft_year_int_none_no_crash(monkeypatch, tmp_path):
+    """Unparseable year → year_int=None → validation runs silently, success reply still sent."""
+    sent = _FakeSend()
+    monkeypatch.setattr("bot_hook._send", sent)
+    monkeypatch.setenv("GOOGLE_SHEET_ID", "sid")
+    monkeypatch.setenv("GOOGLE_SERVICE_ACCOUNT_JSON", "/creds.json")
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "schedule_mapping.json").write_text(json.dumps(_MAPPING), encoding="utf-8")
+    monkeypatch.setattr("bot_hook._ROOT", str(tmp_path))
+
+    monkeypatch.setattr("google_sheets_adapter.read_cell", lambda sid, tab, cell, creds: "червень" if cell == "A1" else "2026X")
+    monkeypatch.setattr("google_sheets_adapter.get_staff_list", lambda *a, **kw: _STAFF)
+    monkeypatch.setattr("google_sheets_adapter.get_schedule_grid", lambda *a, **kw: _GRID)
+    monkeypatch.setattr("google_sheets_adapter.write_schedule_grid", lambda *a, **kw: None)
+
+    _cmd_draft("T", "42")
+    assert sent.count == 1
+    assert "✅" in sent.last_text
+
+
+def test_cmd_draft_year_int_none_no_warning_in_reply(monkeypatch, tmp_path):
+    """Unparseable year → no extra warning about year in the reply."""
+    sent = _FakeSend()
+    monkeypatch.setattr("bot_hook._send", sent)
+    monkeypatch.setenv("GOOGLE_SHEET_ID", "sid")
+    monkeypatch.setenv("GOOGLE_SERVICE_ACCOUNT_JSON", "/creds.json")
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    mapping = dict(_MAPPING)
+    mapping["scheduler_date_column"] = "Date"
+    mapping["date_column"] = "Date"
+    (data_dir / "schedule_mapping.json").write_text(json.dumps(mapping), encoding="utf-8")
+    monkeypatch.setattr("bot_hook._ROOT", str(tmp_path))
+
+    monkeypatch.setattr("google_sheets_adapter.read_cell", lambda sid, tab, cell, creds: "червень" if cell == "A1" else "BAD")
+    monkeypatch.setattr("google_sheets_adapter.get_staff_list", lambda *a, **kw: _STAFF)
+    monkeypatch.setattr("google_sheets_adapter.get_schedule_grid", lambda *a, **kw: _GRID)
+    monkeypatch.setattr("google_sheets_adapter.write_schedule_grid", lambda *a, **kw: None)
+
+    _cmd_draft("T", "42")
+    assert "рік" not in sent.last_text.lower()
+
+
 def test_cmd_draft_warnings_appended_to_grid(monkeypatch, tmp_path):
     written: list = []
 

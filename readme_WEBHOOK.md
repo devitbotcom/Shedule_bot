@@ -137,3 +137,60 @@ curl -s "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/deleteWebhook"
 | `curl` returns 404 or HTML instead of `{}` | App not started in cPanel, or `passenger_wsgi.py` missing from app root |
 | 403 from bot_hook                   | `WEBHOOK_SECRET_TOKEN` mismatch — fix `.env`, re-run Step 3 |
 | Role stays `pending`                | Run Step 4 (`--bootstrap-it`) first                         |
+
+---
+
+### "Virtual environment already exists" error during setup
+
+cPanel Python App UI refuses to create a new app because a `venv/` directory already exists.
+
+**Fix:**
+
+1. In **cPanel → Software → Setup Python App**, find the existing app and click **Remove Application** (this removes the app config but does not delete your files).
+2. Delete the old virtual environment:
+   ```bash
+   rm -rf ~/Shedule_bot/venv
+   ```
+3. Re-create the app following Step 1 of this guide.
+
+---
+
+### Existing app configured for wrong domain
+
+If the app was previously created with the wrong Application URL, the webhook URL will not match.
+
+**Fix:**
+
+1. In **cPanel → Software → Setup Python App**, click **Remove Application** on the existing app.
+2. Re-create it with the correct **Application URL** (Step 1 of this guide).
+3. Re-run Step 3 (`--register-webhook`) so Telegram is updated with the new URL.
+
+You can verify Telegram has the correct URL:
+
+```bash
+curl -s "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo" | python3 -m json.tool
+```
+
+The `url` field in the response should match your webhook URL exactly.
+
+---
+
+### Webhook registered but bot not receiving messages
+
+Telegram reports the webhook as set but the bot never responds.
+
+**Checks:**
+
+1. Verify the webhook URL and secret are registered correctly:
+   ```bash
+   curl -s "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo" | python3 -m json.tool
+   ```
+   Confirm `url` matches your server URL and `has_custom_certificate` is `false` (unless you are using a self-signed cert).
+
+2. Confirm the app is running in cPanel — visit `https://<YOUR_DOMAIN>/Shedule_bot` in a browser; it should return `{}`.
+
+3. Check the secret token in `.env` matches what was registered:
+   ```bash
+   grep WEBHOOK_SECRET_TOKEN ~/Shedule_bot/.env
+   ```
+   If in doubt, regenerate the token, update `.env`, and re-run `--register-webhook`.
