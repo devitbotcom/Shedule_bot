@@ -30,3 +30,15 @@ Only errors are logged to `webhook.log`. Each incoming Telegram update is not re
 ### 006b2-01 Invalid year silently skips validation [Low, S007+]
 
 In `bot_hook._cmd_draft`, if `year_str` cannot be parsed as an integer, `year_int` is set to `None` and the entire validator call is skipped without any feedback to Head. Only V4 and V6 require `year_int`; checks V1, V2, V3, V5, V7 could still run. No warning is sent to Head that validation was bypassed.
+
+### 06b-03 Add Google Sheet link to `/draft` success response [Low, backlog]
+
+The positive `/draft` reply does not include a link to the Google Sheet where the result was written. Head must navigate to the sheet manually after running the command.
+
+Expected: success message includes a clickable link to the output tab, e.g.:
+```
+✅ Чернетку розкладу на червень 2026 записано у вкладку 'Draft-by-bot'.
+🔗 https://docs.google.com/spreadsheets/d/<SHEET_ID>
+```
+
+The `GOOGLE_SHEET_ID` is already available in `bot_hook._cmd_draft` at the time the reply is sent.

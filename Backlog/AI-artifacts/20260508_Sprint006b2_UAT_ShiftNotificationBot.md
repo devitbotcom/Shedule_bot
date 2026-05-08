@@ -85,36 +85,36 @@ cd ~/Shedule_bot && source venv/bin/activate && TZ=Europe/Kyiv python main.py --
 
 ## UAT sign-off
 
-| Case     | Result              | Notes                                    |
-|----------|---------------------|------------------------------------------|
-| U006b2-1 | OK                  |                                          |
-| U006b2-2 | ⏸ Re-run required  | V5 message + tab fix applied             |
-| U006b2-3 | ⏸ Re-run required  | `_cell()` fix applied                    |
-| U006b2-4 | OK                  |                                          |
+| Case     | Result | Notes                                    |
+|----------|--------|------------------------------------------|
+| U006b2-1 | OK     |                                          |
+| U006b2-2 | OK     |             |
+| U006b2-3 | OK     |                    |
+| U006b2-4 | OK     |                                          |
 
 **Status:** ⏸ Pending Owner re-run of U006b2-2 and U006b2-3
 
 ## Feedback:
 
-### 06b2-1 Add also warning if mon-fri is not a labor day [high]
+### 06b2-1 Add also warning if mon-fri is not a labor day [high] - DONE
 
-### 06b2-2 Readability of dates mix up message [high]
+### 06b2-2 Readability of dates mix up message [high] - DONE
 Actual:
 • Дні йдуть не по порядку або є пропуски
 Expected: 
 - add rows, where are the issues, so user can find it easily.
 - add warnings listed under content in tab Draft-by-bot, so user can see it not only in the messenger.
 
-### 06b2-3  Failed U006b2-3 [CRITICAL]
+### 06b2-3  Failed U006b2-3 [CRITICAL] - DONE
 STR: U006b2-3 — Warning appears for empty day-type cell
 Actual: No warning values set by scheduler.
 Expected: as agreed - warning (as user knows better what is the daytype)
 
-### see 06b-02 lack of visibility with integration failures - [medium]
+### see 06b-02 lack of visibility with integration failures - [medium] 
 
-### see 06b-01 Bot silent, but it is invisible for support - [HIGH]
+### see 06b-01 Bot silent, but it is invisible for support - [HIGH] 
 
-### 06b-03 Usability - CR. Add link to google sheet into positive response. - [LOW]
+### 06b-03 Usability - CR. Add link to google sheet into positive response. - [LOW] 
 
 
 

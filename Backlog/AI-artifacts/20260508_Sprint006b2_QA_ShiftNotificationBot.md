@@ -86,17 +86,24 @@
 | 06b2-2 part 1 (round 2) — V5 message still unreadable | Message changed to "після дня {prev} очікувався день {exp}, знайдено {actual}" — actual day numbers visible in spreadsheet | T6 re-asserts against day numbers |
 | 06b2-2 part 2 — warnings not in tab | Warning block appended to `filled_grid` before write | `test_cmd_draft_warnings_appended_to_grid` |
 
-**Suite after all fixes: 162/162 passing.**
+**Suite after all fixes: 164/164 passing** (includes 06b-04 initials fix + 2 new tests).
 
 **Post-UAT findings:**
 
 | ID | Severity | Location | Description |
 |---|---|---|---|
-| F3 | 🔵 Low | `schedule_validator.py` | V5 `for…else` dead code — `else` never fires since `expected_seq` is same length as `day_numbers`. **Fixed — `else` branch removed 2026-05-08.** |
+| F3 | 🔵 Low | `schedule_validator.py` | V5 `for…else` dead code. **Fixed — removed 2026-05-08.** |
+| F4 | 🟡 Low | `tests/test_schedule_validator.py:78` | `test_v4_leap_year_no_warning` asserts `"має бути"` — stale text after AD-S006b2-008. Test passes but assertion no longer guards V4 false positives. **Open — Developer to fix.** |
+| F5 | 🟡 Low | `schedule_validator.py` V6 | Inner `except (ValueError, OverflowError)` does not catch `TypeError`. If `year_int=None` reaches `date()`, V6/V6b silently aborts. Production safe (bot_hook guards). **See KI-004.** |
+| F6 | 🟡 Low | `schedule_validator.py` V3 | Missing date column causes V3 to cascade: `[Структура] N рядків` fires alongside `[Налаштування]` warning. Noise only — root cause clear from tag. **See KI-005.** |
+
+**Logic review verdict:** all 7 checks logically correct. No false positives in normal operation. F5/F6 are latent edge cases, not production bugs.
 
 ## Overall verdict
 
-**✅ ACCEPTED — all UAT findings resolved. F1/F3 fixed, F2 deferred. 162/162 passing. Zero regressions.**
+**✅ ACCEPTED — UAT findings and 06b-04 resolved. F4 open (test quality). F2/F5/F6 deferred to KI. 164/164 passing. Zero regressions.**
+
+KI document: `Backlog/AI-artifacts/20260508_KnownIssues_ShiftNotificationBot.md`
 
 ---
 
@@ -104,7 +111,7 @@
 
 | Role | Date | Status |
 |---|---|---|
-| Architect | 2026-05-07 | ✅ |
+| Architect | 2026-05-08 | ✅ AD-S006b2-008 added |
 | Developer | 2026-05-08 | ✅ |
-| QA | 2026-05-08 | ✅ All UAT findings verified resolved; F2 deferred |
-| Owner | — | ⏸ UAT re-run pending |
+| QA | 2026-05-08 | ✅ Logic review done; F4 open; KI published |
+| Owner | — | ⏸ UAT re-run pending (U006b2-2, U006b2-3) |
