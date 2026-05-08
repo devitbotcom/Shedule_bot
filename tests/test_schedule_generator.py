@@ -210,8 +210,8 @@ def test_c8_neutral_assigned_before_undesired():
     assert result[1][2] == "Bob"
 
 
-def test_c8_all_undesired_slot_still_filled():
-    """Both candidates mark day 3 as undesired — slot still filled (soft constraint)."""
+def test_c8_all_undesired_slot_empty_with_warning():
+    """Both candidates mark day 3 as undesired — slot left empty + warning."""
     staff = [
         {"name": "Alice", "department": "Surgery", "preferred_days": [], "undesired_days": [3]},
         {"name": "Bob",   "department": "Surgery", "preferred_days": [], "undesired_days": [3]},
@@ -220,8 +220,9 @@ def test_c8_all_undesired_slot_still_filled():
         ["Day", "Day-type", "Surgery"],
         ["3", "labour", ""],
     ]
-    result, _ = generate_schedule(staff, grid, _PREF_MAPPING)
-    assert result[1][2] in ("Alice", "Bob")   # someone assigned
+    result, warnings = generate_schedule(staff, grid, _PREF_MAPPING)
+    assert result[1][2] == ""
+    assert any("[Персонал]" in w and "небажаний" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -313,17 +314,17 @@ def test_v8_conflicted_person_assigned_on_conflict_and_other_days():
 # V10 — skip preference tiers when all eligible candidates prefer the same day
 # ---------------------------------------------------------------------------
 
-def test_v10_all_prefer_same_day_slot_still_filled():
-    """All staff prefer day 1 → V10 warning, preference skipped, slot still filled."""
+def test_v10_all_prefer_same_day_slot_empty_with_warning():
+    """All staff prefer day 1 → slot left empty + warning."""
     staff = [
         {"name": "Alice", "department": "Surgery", "preferred_days": [1], "undesired_days": []},
         {"name": "Bob",   "department": "Surgery", "preferred_days": [1], "undesired_days": []},
     ]
     grid = [["Day", "Day-type", "Surgery"], ["1", "labour", ""]]
     result, warnings = generate_schedule(staff, grid, _PREF_MAPPING)
-    assert result[1][2] in ("Alice", "Bob")
+    assert result[1][2] == ""
     assert any("[Персонал]" in w and "Surgery" in w and "день 1" in w
-               and "перевага не застосовується" in w for w in warnings)
+               and "слот залишено порожнім" in w for w in warnings)
 
 
 def test_v10_not_all_prefer_same_day_no_false_positive():

@@ -93,11 +93,16 @@ def generate_schedule(
                 neutral = [s for s in eligible
                            if s["name"] not in preferred_names and s["name"] not in undesired_names]
                 undesired = [s for s in eligible if s["name"] in undesired_names]
-                if all(day_number in s.get("preferred_days", []) for s in eligible):
+                if preferred and len(preferred) == len(eligible):
                     generation_warnings.append(
-                        f"[Персонал] '{dept}' — день {day_number} бажаний для всіх лікарів відділення, перевага не застосовується"
+                        f"[Персонал] '{dept}' — день {day_number} бажаний для всіх лікарів відділення, слот залишено порожнім"
                     )
-                    preferred, neutral, undesired = [], eligible, []
+                    continue
+                if not preferred and not neutral:
+                    generation_warnings.append(
+                        f"[Персонал] '{dept}' — день {day_number} небажаний для всіх лікарів відділення, слот залишено порожнім"
+                    )
+                    continue
             else:
                 preferred, neutral, undesired = [], eligible, []
 
