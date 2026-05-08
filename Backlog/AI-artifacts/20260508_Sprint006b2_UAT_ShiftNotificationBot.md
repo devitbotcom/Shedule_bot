@@ -3,6 +3,8 @@
 **Sprint:** S006b2 — Draft Validation Warnings
 **Prepared by:** QA
 
+STATUS : ACCEPTED
+
 ---
 
 ## What this sprint delivers

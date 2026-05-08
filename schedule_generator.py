@@ -11,15 +11,15 @@ def generate_schedule(
     staff_list: list[dict],
     template_grid: list[list],
     mapping: dict,
-) -> list[list]:
-    """Returns template_grid copy with staff assigned per department using weighted greedy."""
+) -> tuple[list[list], list[str]]:
+    """Returns (grid_copy_with_assignments, generation_warnings)."""
     header_idx = (mapping.get("scheduler_header_row") or mapping["header_row"]) - 1
     day_type_col = mapping.get("scheduler_day_type_column") or mapping["day_type_column"]
     dept_cols = mapping.get("scheduler_department_columns") or mapping["department_columns"]
     date_col = mapping.get("scheduler_date_column") or mapping.get("date_column")
 
     if not template_grid or len(template_grid) <= header_idx:
-        return [list(row) for row in template_grid]
+        return [list(row) for row in template_grid], []
 
     headers = template_grid[header_idx]
     col_idx = {h: i for i, h in enumerate(headers)}
@@ -29,6 +29,8 @@ def generate_schedule(
         dept_staff[s["department"]].append(s)
 
     counts: dict[str, int] = defaultdict(int)
+    last_day: dict[str, int] = {}
+    generation_warnings: list[str] = []
     result = [list(row) for row in template_grid]
 
     day_type_idx = col_idx.get(day_type_col)
@@ -41,7 +43,7 @@ def generate_schedule(
             if not day_type_val:
                 continue
 
-        # Read day number for preference matching (C8)
+        # Read day number for preference matching (C8) and consecutive check (C9)
         day_number = None
         if date_col_idx is not None and date_col_idx < len(row):
             try:
@@ -67,17 +69,28 @@ def generate_schedule(
             if not candidates:
                 continue
 
-            # C8: three-tier preference selection (preferred → neutral → undesired)
+            # C9: filter out candidates who worked the previous calendar day (hard constraint)
             if day_number is not None:
-                preferred_names = {s["name"] for s in candidates if day_number in s.get("preferred_days", [])}
-                undesired_names = {s["name"] for s in candidates if day_number in s.get("undesired_days", [])}
-                preferred = [s for s in candidates if s["name"] in preferred_names]
-                neutral = [s for s in candidates
+                eligible = [s for s in candidates if last_day.get(s["name"]) != day_number - 1]
+                if not eligible:
+                    generation_warnings.append(
+                        f"[День {day_number}] відділення '{dept}' — усі лікарі були на чергуванні вчора, слот залишено порожнім"
+                    )
+                    continue
+            else:
+                eligible = candidates
+
+            # C8: three-tier preference selection on eligible candidates
+            if day_number is not None:
+                preferred_names = {s["name"] for s in eligible if day_number in s.get("preferred_days", [])}
+                undesired_names = {s["name"] for s in eligible if day_number in s.get("undesired_days", [])}
+                preferred = [s for s in eligible if s["name"] in preferred_names]
+                neutral = [s for s in eligible
                            if s["name"] not in preferred_names and s["name"] not in undesired_names]
-                undesired = [s for s in candidates
+                undesired = [s for s in eligible
                              if s["name"] in undesired_names and s["name"] not in preferred_names]
             else:
-                preferred, neutral, undesired = [], candidates, []
+                preferred, neutral, undesired = [], eligible, []
 
             chosen = None
             for tier in (preferred, neutral, undesired):
@@ -91,5 +104,7 @@ def generate_schedule(
             if col < len(row):
                 row[col] = chosen["name"]
             counts[chosen["name"]] += 1
+            if day_number is not None:
+                last_day[chosen["name"]] = day_number
 
-    return result
+    return result, generation_warnings

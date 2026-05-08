@@ -99,16 +99,18 @@ def _cmd_draft(token: str, chat_id: str) -> None:
     for w in validation_warnings:
         logging.warning("draft validation: %s", w)
 
+    generation_warnings: list[str] = []
     try:
-        filled_grid = generate_schedule(staff_list, template_grid, mapping)
+        filled_grid, generation_warnings = generate_schedule(staff_list, template_grid, mapping)
     except Exception as exc:
         _send(token, chat_id, f"❌ Помилка генерації розкладу: {exc}")
         return
 
-    if validation_warnings:
+    all_warnings = validation_warnings + generation_warnings
+    if all_warnings:
         filled_grid.append([])
         filled_grid.append(["⚠️ Попередження:"])
-        for w in validation_warnings:
+        for w in all_warnings:
             filled_grid.append([f"• {w}"])
 
     try:
@@ -119,8 +121,8 @@ def _cmd_draft(token: str, chat_id: str) -> None:
 
     reply = f"✅ Чернетку розкладу на {month_str} {year_str} записано у вкладку '{output_tab}'."
     reply += f"\n🔗 https://docs.google.com/spreadsheets/d/{sheet_id} — вкладка '{output_tab}'"
-    if validation_warnings:
-        warn_block = "\n".join(f"• {w}" for w in validation_warnings)
+    if all_warnings:
+        warn_block = "\n".join(f"• {w}" for w in all_warnings)
         reply += f"\n\n⚠️ Попередження:\n{warn_block}"
     _send(token, chat_id, reply)
 

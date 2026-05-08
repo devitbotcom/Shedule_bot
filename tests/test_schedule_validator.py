@@ -243,10 +243,10 @@ def test_c3_year_none_v1_still_runs():
     assert any("[Персонал]" in w and "Surgery" in w for w in warnings)
 
 
-def test_c3_year_none_no_extra_warning():
+def test_c3_year_none_warning_present():
     grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
     warnings = validate_draft_grid(grid, _MAPPING, _STAFF, _JUNE_MONTH, None)
-    assert not any("рік" in w.lower() for w in warnings)
+    assert any("[Налаштування]" in w and "рік" in w for w in warnings)
 
 
 def test_c3_year_none_v4_not_in_warnings():

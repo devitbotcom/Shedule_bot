@@ -1,6 +1,6 @@
 # Sprint S006c — Architecture
 **Date:** 2026-05-08
-**Sprint:** S006c — Pre-filled Constraints + Quality Closure
+**Sprint:** S006c — Pre-filled Constraints + Quality Closure + UAT Patch (P1–P3)
 **Depends on:** S006b2 accepted
 
 ---
@@ -57,16 +57,18 @@ Append a clickable link to the Google Sheet after the confirmation line:
 
 `sheet_id` and the output tab name are already in scope at the point the reply is built. No new config needed.
 
-### C3 — Warn when year unreadable (`bot_hook.py`)
+### C3 — Warn when year unreadable (`bot_hook.py`) *(updated by UAT P1)*
 
 Currently: if `year_str` cannot be parsed as integer, `year_int = None` and the entire validator is skipped silently.
 
-New behaviour (silent partial run):
+New behaviour:
 - If `year_int is None`: run validator with `year_int=None` for V1/V2/V3/V5/V7 (these do not need year)
-- V4 and V6 are skipped — no warning sent to Head
-- No change to the success/warning reply format
+- V4 and V6 are skipped
+- **One warning appended:** `[Налаштування] рік не вдалось прочитати — перевірки V4 і V6 пропущено`
 
 Requires small refactor: validator must accept `year_int: int | None` and guard V4/V6 internally instead of the guard living in `bot_hook`.
+
+> **UAT P1 (2026-05-08):** Owner reversed OQ-2 during UAT — silent behaviour was confusing. Warning is now mandatory. See AD-S006c-003 (updated).
 
 ### C4 — Fix V3 cascade on missing date column (`schedule_validator.py`)
 
@@ -118,6 +120,26 @@ Algorithm picks the best candidate from the first non-empty tier. This is a **so
 
 Pre-filled cells (C1) are processed before preference logic runs, so their shift counter increments are already reflected when tier sorting occurs.
 
+### C9 — No-consecutive-day constraint (`schedule_generator.py`) *(UAT P3)*
+
+**Source:** UAT finding 06c-01 — greedy algorithm produced back-to-back shifts for the same person.
+
+The algorithm must not assign the same person on two consecutive calendar days. This is a **hard constraint**: if all candidates for a slot worked the previous calendar day, the slot is left empty and a warning is generated.
+
+**Tracking:** `generate_schedule` maintains `last_day: dict[str, int]` — maps each person's name to the most recent calendar day number they were assigned (across all departments in the same run).
+
+**Selection logic change per slot:**
+1. From all candidates (across the three preference tiers), remove anyone whose `last_day[name] == day_number - 1`
+2. If remaining candidates exist: apply three-tier preference + shift-count selection as before
+3. If **no** remaining candidates (all worked yesterday): leave slot empty; append warning `[День {day_number}] відділення '{dept}' — усі лікарі були на чергуванні вчора, слот залишено порожнім`
+
+**Interface change:** `generate_schedule` now returns a tuple `(grid: list[list], warnings: list[str])`. `bot_hook._cmd_draft` merges generation warnings with validation warnings in the reply and sheet output.
+
+**Edge cases:**
+- Day 1 of the grid: `last_day` is empty for everyone → no consecutive penalty → normal selection
+- `day_number is None` (unparseable date cell): consecutive check is skipped → normal selection
+- Pre-filled cells: `last_day` is **not** updated for pre-fills (the pre-fill date is not tracked)
+
 ### C6 — `readme_WEBHOOK.md` troubleshooting section
 
 Add a troubleshooting subsection covering three scenarios encountered during S005 UAT:
@@ -136,8 +158,8 @@ Pre-filled cells are treated as already-assigned shifts. The algorithm reads the
 **AD-S006c-002 — Unknown pre-fill name is ignored for counting**
 If the pre-filled name does not match any staff member in the department, shift counting is skipped and the cell is still left unchanged. A warning is out of scope for S006c (would require validator change — deferred to S006d/S008).
 
-**AD-S006c-003 — year_int guard moves into validator**
-The `if year_int is not None` guard in `bot_hook` is replaced by internal guards on V4 and V6 inside `validate_draft_grid`. Signature changes to `year_int: int | None`. This is the correct location — the validator should know which of its checks require year, not the caller.
+**AD-S006c-003 — year_int guard moves into validator; warning mandatory** *(updated UAT P1)*
+The `if year_int is not None` guard in `bot_hook` is replaced by internal guards on V4 and V6 inside `validate_draft_grid`. Signature changes to `year_int: int | None`. When `year_int is None`, the validator appends `[Налаштування] рік не вдалось прочитати — перевірки V4 і V6 пропущено`. Owner reversed the "silent" decision (OQ-2) during UAT — Head must be informed when year is unreadable.
 
 **AD-S006c-004 — Sheet link uses base URL with tab name as text**
 Link format: `https://docs.google.com/spreadsheets/d/{sheet_id} — вкладка '{tab_name}'`. No direct tab anchor (tab anchors require `gid`, unavailable without an extra API call). Tab name appears as readable text so Head knows where to look after clicking.
@@ -151,19 +173,25 @@ Column header names are stored in `schedule_mapping.json` under keys `scheduler_
 **AD-S006c-007 — Preference values: comma-separated integers**
 Cell format: `"1, 5, 10"` — comma-separated day-of-month numbers. Non-numeric tokens are silently skipped. This is the simplest format Head can fill manually, and it is also machine-writable when AI normalisation is added in S007. No validation against the actual month length (out of scope for S006c — an out-of-range day is simply never matched).
 
+**AD-S006c-008 — No-consecutive is a hard constraint with warning** *(UAT P3)*
+Owner decision (OQ-6): if all candidates for a slot worked the previous calendar day, the slot is left **empty** — no assignment is forced. A warning is appended so Head can fill the gap manually. An empty slot is preferable to an unknown back-to-back shift that Head may not notice. `generate_schedule` returns `(grid, warnings)` to surface these gaps.
+
+**AD-S006c-009 — Preference column names are fully user-defined via mapping** *(UAT P2 clarification)*
+`scheduler_preferred_dates_column` and `scheduler_undesired_dates_column` in `schedule_mapping.json` must be set to whatever column headers the Owner uses in their Staff tab. No default value is assumed. The `schedule_mapping.json.example` uses Ukrainian names (`"бажано"`, `"не бажано"`) purely as illustration — the Owner chooses their own names. Confirmed during UAT: Owner expected this to work like `scheduler_department_columns`.
+
 ---
 
 ## Modified files
 
 | File                               | Change                                                                              |
 |------------------------------------|-------------------------------------------------------------------------------------|
-| `schedule_generator.py`            | C1 — skip non-empty cells; count pre-filled staff; C8 — preference-aware selection |
-| `bot_hook.py`                      | C2 — append Sheet link; C3 — move year guard, warn on unparseable year              |
-| `schedule_validator.py`            | C3 — accept `year_int: int \| None`; guard V4/V6; C4 — skip V2/V3 loop when col missing |
-| `google_sheets_adapter.py`         | C7 — read `preferred_dates` and `undesired_dates` columns in `get_staff_list`       |
-| `schedule_mapping.json`            | C7 — add `scheduler_preferred_dates_column` and `scheduler_undesired_dates_column`  |
-| `tests/test_schedule_validator.py` | C5 — fix T5a assertion; new tests for C3/C4                                         |
-| `tests/test_schedule_generator.py` | New tests for C1, C8                                                                |
+| `schedule_generator.py`            | C1 — skip non-empty cells; count pre-filled staff; C8 — preference-aware selection; C9 — no-consecutive hard constraint; return `(grid, warnings)` |
+| `bot_hook.py`                      | C2 — append Sheet link; C3 — move year guard, warn on unparseable year; C9 — merge generation warnings into reply |
+| `schedule_validator.py`            | C3 — accept `year_int: int \| None`; guard V4/V6; warn when None; C4 — skip V2/V3 loop when col missing |
+| `google_sheets_adapter.py`         | C7 — read preference columns in `get_staff_list`                                    |
+| `schedule_mapping.json.example`    | C9/P2 — update preference column example values to Ukrainian; add explanatory comment |
+| `tests/test_schedule_validator.py` | C5 — fix T5a assertion; new tests for C3/C4 (including C3-b: warning present)       |
+| `tests/test_schedule_generator.py` | New tests for C1, C8, C9                                                            |
 | `tests/test_cmd_draft.py`          | New tests for C2/C3                                                                 |
 | `readme_WEBHOOK.md`                | C6 — troubleshooting section                                                        |
 
@@ -178,7 +206,7 @@ Cell format: `"1, 5, 10"` — comma-separated day-of-month numbers. Non-numeric 
 | C1-c | Unknown pre-fill name — cell unchanged, no crash                               | C1    | Contract    |
 | C2   | Sheet link present in success reply                                            | C2    | EP          |
 | C3-a | year_int=None — V1/V2/V3/V5/V7 still run, no crash                            | C3    | Negative    |
-| C3-b | year_int=None — no warning added to reply                                      | C3    | Contract    |
+| C3-b | year_int=None — [Налаштування] warning present in warnings list                | C3    | Contract    |
 | C3-c | year_int=None — V4/V6 results not in warnings                                  | C3    | Contract    |
 | C4   | Missing date column — V3 does not cascade                                      | C4    | Regression  |
 | C5   | T5a assertion uses new message text                                            | C5    | Regression  |
@@ -188,6 +216,10 @@ Cell format: `"1, 5, 10"` — comma-separated day-of-month numbers. Non-numeric 
 | C8-a | Preferred day — preferred candidate assigned before neutral candidate          | C8    | Priority    |
 | C8-b | Undesired day — neutral candidate assigned before undesired candidate          | C8    | Priority    |
 | C8-c | All candidates undesired — slot still filled (soft constraint)                 | C8    | Contract    |
+| C9-a | Candidate worked yesterday — not assigned today when alternative exists        | C9    | Priority    |
+| C9-b | All candidates worked yesterday — slot left empty, warning generated           | C9    | Contract    |
+| C9-c | Day 1 — no consecutive penalty applied (last_day empty)                        | C9    | Edge case   |
+| C9-d | generate_schedule returns (grid, warnings) tuple                               | C9    | Interface   |
 
 ---
 
@@ -196,18 +228,20 @@ Cell format: `"1, 5, 10"` — comma-separated day-of-month numbers. Non-numeric 
 | #    | Question                                                        | Needed for | Answer                                       |
 |------|-----------------------------------------------------------------|------------|----------------------------------------------|
 | OQ-1 | Sheet link format — base URL only, or include tab name as text? | C2    | ✅ Resolved — include tab name as readable text next to the URL          |
-| OQ-2 | year_int=None — warn Head, or skip silently?                    | C3    | ✅ Resolved — skip silently; no warning sent to Head                     |
+| OQ-2 | year_int=None — warn Head, or skip silently?                    | C3    | ✅ Resolved — **always warn** (reversed during UAT 2026-05-08): `[Налаштування] рік не вдалось прочитати — перевірки V4 і V6 пропущено` |
 | OQ-3 | Pre-fill counting — count holiday days too, or labour only?     | C1    | ✅ Resolved — all day types                                              |
 | OQ-4 | Preferences — per person globally, or can differ per department?    | C7/C8   | Assumption: per person (one row in Staff tab). Owner to confirm if a person can have different preferences when listed under two departments. |
 | OQ-5 | Preference column format — comma-separated integers as specified, or another format (date range, named days)? | C7 | ✅ Resolved — comma-separated day-of-month integers (1–31). Out-of-range values silently never match. |
+| OQ-6 | No-consecutive constraint: hard block (empty slot + warn) or soft (fill anyway)? | C9 | ✅ Resolved — **hard block + warning** (Owner decision 2026-05-08). Empty slot is preferable; Head fills gap manually. |
+| OQ-7 | Preference column names: fix to Ukrainian defaults or fully configurable via mapping? | C7/P2 | ✅ Resolved — **fully configurable** via mapping keys, same pattern as `scheduler_department_columns`. Example shows Ukrainian names as illustration only. |
 
 ---
 
 ## Sign-off
 
-| Role      | Date       | Status                 |
-|-----------|------------|------------------------|
-| Architect | 2026-05-08 | ⏸ Pending Owner review |
-| Developer | —          | ⏸                      |
-| QA        | —          | ⏸                      |
-| Owner     | —          | ⏸                      |
+| Role      | Date       | Status                                              |
+|-----------|------------|-----------------------------------------------------|
+| Architect | 2026-05-08 | ✅ ARCH accepted; UAT patch P1–P3 designed 2026-05-08 |
+| Developer | —          | ⏸ Pending patch implementation                      |
+| QA        | —          | ⏸                                                   |
+| Owner     | —          | ⏸ UAT in progress — U006c-1 ✅, U006c-5 ✅, U006c-6 ✅; U006c-2/3/4 reopened |

@@ -50,6 +50,8 @@ def validate_draft_grid(
         warnings.append(
             f"[Налаштування] стовпець типу дня '{day_type_col}' не знайдено — перевірте scheduler_day_type_column"
         )
+    if year_int is None:
+        warnings.append("[Налаштування] рік не вдалось прочитати — перевірки V4 і V6 пропущено")
 
     # V1 — empty staff per department
     try:

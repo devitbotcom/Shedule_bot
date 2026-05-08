@@ -204,8 +204,8 @@ def test_cmd_draft_year_int_none_no_crash(monkeypatch, tmp_path):
     assert "✅" in sent.last_text
 
 
-def test_cmd_draft_year_int_none_no_warning_in_reply(monkeypatch, tmp_path):
-    """Unparseable year → no extra warning about year in the reply."""
+def test_cmd_draft_year_int_none_warning_in_reply(monkeypatch, tmp_path):
+    """Unparseable year → warning about unreadable year is present in the reply."""
     sent = _FakeSend()
     monkeypatch.setattr("bot_hook._send", sent)
     monkeypatch.setenv("GOOGLE_SHEET_ID", "sid")
@@ -225,7 +225,7 @@ def test_cmd_draft_year_int_none_no_warning_in_reply(monkeypatch, tmp_path):
     monkeypatch.setattr("google_sheets_adapter.write_schedule_grid", lambda *a, **kw: None)
 
     _cmd_draft("T", "42")
-    assert "рік" not in sent.last_text.lower()
+    assert "рік" in sent.last_text.lower()
 
 
 def test_cmd_draft_warnings_appended_to_grid(monkeypatch, tmp_path):

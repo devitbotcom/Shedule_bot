@@ -38,6 +38,7 @@
     "УЗД",
     "Дитяче відділення"
   ],
-  "scheduler_preferred_dates_column":  "preferred_dates",
-  "scheduler_undesired_dates_column":  "undesired_dates"
+  "_comment_preference_columns": "Set these to whatever column headers you use in your Staff tab — any name works, same as scheduler_department_columns",
+  "scheduler_preferred_dates_column":  "бажано",
+  "scheduler_undesired_dates_column":  "не бажано"
 }
