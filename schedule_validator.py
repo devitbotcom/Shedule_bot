@@ -77,9 +77,16 @@ def validate_draft_grid(
         try:
             name = s.get("name", "")
 
-            # Use "or []" to prevent TypeError if the sheet returns None instead of a list
-            pref = s.get("preferred_days") or []
-            undes = s.get("undesired_days") or []
+            pref = s.get("preferred_days")
+            undes = s.get("undesired_days")
+
+            # If Excel sent a single number instead of a list, wrap it in a list
+            if isinstance(pref, int): pref = [pref]
+            if isinstance(undes, int): undes = [undes]
+
+            # If Excel sent None or empty cells, make them empty lists
+            pref = pref or []
+            undes = undes or []
 
             conflict_days = sorted(set(pref) & set(undes))
 
@@ -88,7 +95,7 @@ def validate_draft_grid(
                     f"[Персонал] '{name}' — день {day} — однакова дата в бажаних і небажаних. Перевагу скасовано."
                 )
         except Exception:
-            continue  # Skip this broken staff record and move to the next one
+            continue  # If this person's data is totally broken, skip to the next person
 
     # V9 — out-of-range day numbers in preference lists (requires year_int)
     if year_int is not None:
