@@ -290,7 +290,7 @@ def test_v8_conflict_warns():
               "preferred_days": [5], "undesired_days": [5]}]
     grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
     warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
-    assert any("[Персонал]" in w and "день 5" in w and "бажаних, і в небажаних" in w for w in warnings)
+    assert any("[Персонал]" in w and "день 5" in w and "однакова дата" in w for w in warnings)
 
 
 def test_v8_no_conflict_no_warning():
@@ -298,7 +298,7 @@ def test_v8_no_conflict_no_warning():
               "preferred_days": [1], "undesired_days": [2]}]
     grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
     warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
-    assert not any("бажаних, і в небажаних" in w for w in warnings)
+    assert not any("однакова дата" in w for w in warnings)
 
 
 def test_v8_multiple_conflict_days_all_warned():
@@ -306,8 +306,8 @@ def test_v8_multiple_conflict_days_all_warned():
               "preferred_days": [3, 7], "undesired_days": [3, 7]}]
     grid = _make_clean_grid(_JUNE_MONTH, _JUNE_YEAR)
     warnings = validate_draft_grid(grid, _MAPPING, staff, _JUNE_MONTH, _JUNE_YEAR)
-    assert any("день 3" in w and "бажаних, і в небажаних" in w for w in warnings)
-    assert any("день 7" in w and "бажаних, і в небажаних" in w for w in warnings)
+    assert any("день 3" in w and "однакова дата" in w for w in warnings)
+    assert any("день 7" in w and "однакова дата" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------

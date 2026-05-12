@@ -222,7 +222,7 @@ def test_c8_all_undesired_slot_empty_with_warning():
     ]
     result, warnings = generate_schedule(staff, grid, _PREF_MAPPING)
     assert result[1][2] == ""
-    assert any("[Персонал]" in w and "небажаний" in w for w in warnings)
+    assert any("[Персонал]" in w and "конфліктна дата" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +318,7 @@ def test_v8_all_conflicted_slot_empty_with_warning():
     grid = [["Day", "Day-type", "Surgery"], ["1", "labour", ""]]
     result, warnings = generate_schedule(staff, grid, _PREF_MAPPING)
     assert result[1][2] == ""
-    assert any("[Персонал]" in w and "конфліктна перевага" in w for w in warnings)
+    assert any("[Персонал]" in w and "конфліктна дата" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -335,7 +335,7 @@ def test_v10_all_prefer_same_day_slot_empty_with_warning():
     result, warnings = generate_schedule(staff, grid, _PREF_MAPPING)
     assert result[1][2] == ""
     assert any("[Персонал]" in w and "Surgery" in w and "день 1" in w
-               and "слот залишено порожнім" in w for w in warnings)
+               and "конфліктна дата" in w for w in warnings)
 
 
 def test_v10_not_all_prefer_same_day_no_false_positive():
